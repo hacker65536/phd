@@ -1,0 +1,38 @@
+# phd 設定ファイル例
+#
+# 配置場所（--config 未指定時に探索）:
+#   ./config.yaml  または  ~/.config/phd/config.yaml
+# 優先順位: コマンドラインフラグ > この config > 環境変数(PHD_*) > 既定
+# キーはフラグ名と同じ（ダッシュ含む）。
+
+# AWS
+profile: "my-sso-profile"  # ~/.aws/config のプロファイル名
+scope: organization        # organization | account
+
+# 選択（既定は status: open,upcoming・時間窓なし）
+status: ""                 # 例: "upcoming" / "open,upcoming,closed"
+within: ""                 # 前方ホライズン 例: 90d
+since: ""                  # 履歴モード 例: 30d
+starting: ""               # 監査 例: 2026-06-01..2026-09-01
+open-since: 90d            # open の鮮度（0 で無効）
+
+# 絞り込み（service / filter-region / category はカンマ区切りで複数指定可）
+service: ""                # 例: LAMBDA / "EC2,RDS"
+filter-region: ""          # 例: ap-northeast-1 / "us-east-1,us-west-2"
+category: ""               # 例: scheduledChange / "scheduledChange,accountNotification"
+                           #   （YAML リスト記法 [- scheduledChange] も可）
+event-type: ""             # eventTypeCode への正規表現
+
+# 表示
+group-by: ""               # "" | type | topic
+show-occurrences: false
+no-merge: false
+show-details: false
+show-resources: false
+format: table              # table | json | csv | markdown
+output: ""
+
+# キャッシュ
+cache-ttl: 1h              # 例: 30m / 6h / 1d
+no-cache: false
+refresh: false

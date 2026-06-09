@@ -1,0 +1,49 @@
+# === ビルド成果物 ===
+# phd バイナリ（go build -o phd .）
+/phd
+# 一般的な Go バイナリ・テスト成果物
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+/dist/
+/bin/
+
+# === Go ツール ===
+# カバレッジ
+coverage.txt
+coverage.out
+*.cover
+# vendor を使う場合は追跡したいなら以下をコメントアウト
+# /vendor/
+# go workspace（ローカル専用）
+go.work
+go.work.sum
+
+# === ローカル設定（機密・環境依存） ===
+# 実設定はアカウントID入り profile を含むため追跡しない。
+# テンプレートは config.example.yaml を追跡する。
+/config.yaml
+config.local.yaml
+.env
+.env.*
+
+# === Claude Code（個人ローカル設定のみ除外） ===
+# commands/ など共有資産は追跡する。
+.claude/settings.local.json
+
+# === OS / エディタ ===
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
