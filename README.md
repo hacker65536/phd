@@ -1,5 +1,9 @@
 # phd
 
+[![CI](https://github.com/hacker65536/phd/actions/workflows/ci.yml/badge.svg)](https://github.com/hacker65536/phd/actions/workflows/ci.yml)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/hacker65536/phd)](go.mod)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 AWS Health Dashboard をローカル CLI で確認するツール（Go 製）。
 AWS マネジメントコンソールの不満を解消することを目的としている。
 
@@ -242,3 +246,7 @@ internal/
 ```
 
 取得パイプライン前半（fetch→filter→merge→sort）は `loadLogical` に切り出し、CLI（静的レンダリング）と TUI（遅延ロード付きドリルダウン）が共有する。TUI の AWS 呼び出しは `internal/tui/load.go` の `tea.Cmd` 内に隔離されており、`Update` はメッセージ注入でユニットテストできる。
+
+## ライセンス
+
+[MIT License](LICENSE)
