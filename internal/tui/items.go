@@ -27,11 +27,23 @@ func statusStyle(code string) lipgloss.Style {
 	}
 }
 
+// eventItem は一覧行（occItem / groupItem）から共通フィールドを取り出すためのインターフェース。
+// picker の件数集計や CSV エクスポートで、行の具象型を型スイッチせず扱えるようにする。
+type eventItem interface {
+	category() string             // カテゴリ（cat: フィルタ・件数用）
+	statusCodes() []string        // 含まれる status（st: 件数用。occ は1つ、group は複数）
+	events() []model.LogicalEvent // 配下の論理イベント（CSV エクスポート用）
+}
+
 // occItem は occurrence 一覧の 1 行（list.Item 実装）。
 type occItem struct {
 	ev  model.LogicalEvent
 	now time.Time
 }
+
+func (i occItem) category() string             { return i.ev.Category }
+func (i occItem) statusCodes() []string        { return []string{i.ev.StatusCode} }
+func (i occItem) events() []model.LogicalEvent { return []model.LogicalEvent{i.ev} }
 
 func (i occItem) Title() string {
 	// status は色分け（幅は Render 前にパディングして整列を保つ）。
@@ -59,6 +71,16 @@ type groupItem struct {
 	g     model.EventGroup
 	topic bool
 	now   time.Time
+}
+
+func (i groupItem) category() string             { return i.g.Category }
+func (i groupItem) events() []model.LogicalEvent { return i.g.Occurrences }
+func (i groupItem) statusCodes() []string {
+	out := make([]string, 0, len(i.g.StatusCounts))
+	for k := range i.g.StatusCounts {
+		out = append(out, k)
+	}
+	return out
 }
 
 func (i groupItem) Title() string {

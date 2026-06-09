@@ -64,27 +64,32 @@ func exportEventsCSV(dir string, events []model.LogicalEvent, now time.Time) (st
 	return writeLogicalCSV(dir, "phd-events", events, now)
 }
 
-// exportResources は影響リソース一覧（level 3）で押された e を処理し、
-// 現在表示中のリソースを CSV に書き出して結果を m.flash に残す。
-func (m Model) exportResources() (tea.Model, tea.Cmd) {
-	st := m.state[m.top().occKey]
-	rows := m.visibleResources(st)
-	if st == nil || st.rState != stateLoaded || len(rows) == 0 {
-		m.flash = "(no resources to export)"
+// doExport は「空チェック → cwd 取得 → 書き出し → flash」の共通フロー。
+// write は出力先 dir を受け取り、実際に書いたパスを返す。
+func (m Model) doExport(empty bool, emptyMsg string, n int, noun string, write func(dir string) (string, error)) (tea.Model, tea.Cmd) {
+	if empty {
+		m.flash = emptyMsg
 		return m, nil
 	}
 	dir, err := os.Getwd()
-	if err != nil {
-		m.flash = "export failed: " + err.Error()
-		return m, nil
+	if err == nil {
+		var path string
+		if path, err = write(dir); err == nil {
+			m.flash = fmt.Sprintf("exported %d %s → %s", n, noun, filepath.Base(path))
+			return m, nil
+		}
 	}
-	path, err := writeResourcesCSV(dir, m.top().occ, rows, time.Now())
-	if err != nil {
-		m.flash = "export failed: " + err.Error()
-		return m, nil
-	}
-	m.flash = fmt.Sprintf("exported %d rows → %s", len(rows), filepath.Base(path))
+	m.flash = "export failed: " + err.Error()
 	return m, nil
+}
+
+// exportResources は影響リソース一覧（level 3）で押された e を処理し、
+// 現在表示中のリソースを CSV に書き出して結果を m.flash に残す。
+func (m Model) exportResources() (tea.Model, tea.Cmd) {
+	rows := m.visibleResources(m.state[m.top().occKey])
+	occ := m.top().occ
+	return m.doExport(len(rows) == 0, "(no resources to export)", len(rows), "rows",
+		func(dir string) (string, error) { return writeResourcesCSV(dir, occ, rows, time.Now()) })
 }
 
 // visibleEvents は現在の一覧（フィルタ反映済み）に出ている論理イベントを集める。
@@ -92,11 +97,8 @@ func (m Model) exportResources() (tea.Model, tea.Cmd) {
 func (m Model) visibleEvents() []model.LogicalEvent {
 	var out []model.LogicalEvent
 	for _, it := range m.list.Items() {
-		switch v := it.(type) {
-		case occItem:
-			out = append(out, v.ev)
-		case groupItem:
-			out = append(out, v.g.Occurrences...)
+		if ei, ok := it.(eventItem); ok {
+			out = append(out, ei.events()...)
 		}
 	}
 	return out
@@ -106,20 +108,6 @@ func (m Model) visibleEvents() []model.LogicalEvent {
 // 現在表示中のイベントを CSV に書き出して結果を m.flash に残す。
 func (m Model) exportVisibleEvents() (tea.Model, tea.Cmd) {
 	events := m.visibleEvents()
-	if len(events) == 0 {
-		m.flash = "(no events to export)"
-		return m, nil
-	}
-	dir, err := os.Getwd()
-	if err != nil {
-		m.flash = "export failed: " + err.Error()
-		return m, nil
-	}
-	path, err := exportEventsCSV(dir, events, time.Now())
-	if err != nil {
-		m.flash = "export failed: " + err.Error()
-		return m, nil
-	}
-	m.flash = fmt.Sprintf("exported %d events → %s", len(events), filepath.Base(path))
-	return m, nil
+	return m.doExport(len(events) == 0, "(no events to export)", len(events), "events",
+		func(dir string) (string, error) { return exportEventsCSV(dir, events, time.Now()) })
 }

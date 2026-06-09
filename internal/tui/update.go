@@ -135,52 +135,43 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	if m.top().level == levelDetail {
-		switch msg.String() {
-		case "q":
-			m.quitting = true
-			return m, tea.Quit
-		case "enter", "l", "right":
-			return m.drillToResources() // 影響リソース一覧（3ページ目）へ
-		case "r":
-			return m.refreshCurrent() // キャッシュ無視で現 occurrence を再取得
-		case "esc", "backspace", "left", "h":
-			return m.goBack()
-		default:
-			var cmd tea.Cmd
-			m.detail, cmd = m.detail.Update(msg) // 説明のスクロール
-			return m, cmd
-		}
+	// グローバル: q は全ナビ状態で終了（picker / filtering は上で早期 return 済み）。
+	if msg.String() == "q" {
+		m.quitting = true
+		return m, tea.Quit
 	}
 
-	if m.top().level == levelResources {
+	// 詳細(2) / 影響リソース(3): どちらも m.detail viewport を共有する。
+	// r=再取得 / esc=戻る / その他=スクロール を共通化し、レベル固有のキーだけ分岐する。
+	if lvl := m.top().level; lvl == levelDetail || lvl == levelResources {
 		switch msg.String() {
-		case "q":
-			m.quitting = true
-			return m, tea.Quit
-		case "a":
-			// RESOLVED の表示/非表示トグル（スクロール位置は維持）。
-			m.showResolved = !m.showResolved
-			m.detail.SetContent(m.resourcesContent(m.state[m.top().occKey]))
-			return m, nil
-		case "e":
-			// 現在表示中（visible）のリソースを CSV にエクスポート。
-			return m.exportResources()
 		case "r":
 			return m.refreshCurrent() // キャッシュ無視で現 occurrence を再取得
 		case "esc", "backspace", "left", "h":
 			return m.goBack()
-		default:
-			var cmd tea.Cmd
-			m.detail, cmd = m.detail.Update(msg) // リソース一覧のスクロール
-			return m, cmd
+		case "enter", "l", "right":
+			if lvl == levelDetail {
+				return m.drillToResources() // 影響リソース一覧（3ページ目）へ
+			}
+		case "a":
+			if lvl == levelResources {
+				// RESOLVED の表示/非表示トグル（スクロール位置は維持）。
+				m.showResolved = !m.showResolved
+				m.detail.SetContent(m.resourcesContent(m.state[m.top().occKey]))
+				return m, nil
+			}
+		case "e":
+			if lvl == levelResources {
+				return m.exportResources() // 現在表示中のリソースを CSV へ
+			}
 		}
+		// 上記でハンドルしなかったキーはスクロール。
+		var cmd tea.Cmd
+		m.detail, cmd = m.detail.Update(msg)
+		return m, cmd
 	}
 
 	switch msg.String() {
-	case "q":
-		m.quitting = true
-		return m, tea.Quit
 	case "c":
 		return m.openPicker(&categoryPicker)
 	case "s":
@@ -222,7 +213,6 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // drillDown は現階層の選択行を確定して 1 階層下へ進む。
 // levelOccs→levelDetail のときは詳細・リソースの遅延ロードを発火する。
 func (m Model) drillDown() (tea.Model, tea.Cmd) {
-	m.flash = "" // ページ移動でエクスポート/リフレッシュのメッセージをクリア
 	t := m.top()
 	switch t.level {
 	case levelGroups:
@@ -236,11 +226,7 @@ func (m Model) drillDown() (tea.Model, tea.Cmd) {
 		for _, e := range occs {
 			items = append(items, occItem{ev: e, now: m.now})
 		}
-		m.stack = append(m.stack, frame{
-			level: levelOccs,
-			title: occNoun(),
-			items: items,
-		})
+		m.pushFrame(frame{level: levelOccs, title: occNoun(), items: items})
 		m.syncListFromTop()
 		return m, nil
 
@@ -251,18 +237,29 @@ func (m Model) drillDown() (tea.Model, tea.Cmd) {
 		}
 		t.cursor = m.list.Index()
 		key := firstARN(oi.ev)
-		m.stack = append(m.stack, frame{
-			level:  levelDetail,
-			title:  oi.ev.EventTypeCode,
-			occ:    oi.ev,
-			occKey: key,
-		})
+		m.pushFrame(frame{level: levelDetail, title: oi.ev.EventTypeCode, occ: oi.ev, occKey: key})
 		cmd := m.enterDetail(key, oi.ev)
 		return m, cmd
 
 	default:
 		return m, nil
 	}
+}
+
+// pushFrame はフレームを積む（ナビゲーション時に flash をクリア）。
+func (m *Model) pushFrame(f frame) {
+	m.flash = ""
+	m.stack = append(m.stack, f)
+}
+
+// popFrame は 1 階層戻る（最上位なら false）。戻れたら flash をクリアする。
+func (m *Model) popFrame() bool {
+	if len(m.stack) <= 1 {
+		return false
+	}
+	m.flash = ""
+	m.stack = m.stack[:len(m.stack)-1]
+	return true
 }
 
 // enterDetail は詳細画面へ入る。未ロードなら遅延ロードを発火し、ロード済みなら即座に内容を表示する。
@@ -299,13 +296,7 @@ func (m *Model) enterDetail(key string, ev model.LogicalEvent) tea.Cmd {
 // リソースは詳細入場時に既にロード中/済みなので、ここでは表示するだけ。
 func (m Model) drillToResources() (tea.Model, tea.Cmd) {
 	t := m.top()
-	m.flash = "" // ページ移動でエクスポート結果メッセージをクリア
-	m.stack = append(m.stack, frame{
-		level:  levelResources,
-		title:  t.title,
-		occ:    t.occ,
-		occKey: t.occKey,
-	})
+	m.pushFrame(frame{level: levelResources, title: t.title, occ: t.occ, occKey: t.occKey})
 	m.showCurrentPage()
 	return m, nil
 }
@@ -354,11 +345,9 @@ func (m Model) applyPicker() (tea.Model, tea.Cmd) {
 
 // goBack は 1 階層戻る（最上位なら何もしない）。
 func (m Model) goBack() (tea.Model, tea.Cmd) {
-	if len(m.stack) <= 1 {
+	if !m.popFrame() {
 		return m, nil
 	}
-	m.flash = "" // ページ移動でエクスポート結果メッセージをクリア
-	m.stack = m.stack[:len(m.stack)-1]
 	m.syncListFromTop() // 一覧階層なら list を同期（detail/resources では no-op）
 	m.showCurrentPage() // detail/resources に戻ったら該当ページを再描画
 	return m, nil

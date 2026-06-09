@@ -2,8 +2,6 @@ package tui
 
 import (
 	"strings"
-
-	"github.com/charmbracelet/bubbles/list"
 )
 
 // 低カーディナリティの固定 enum 軸（category / status）をチェックボックスで選ぶピッカー。
@@ -27,33 +25,21 @@ var (
 	statusPicker   = pickerSpec{field: "st", title: "Status フィルタ（space で ON/OFF）", values: statuses}
 )
 
-// itemCategory は一覧行のカテゴリを返す。
-func itemCategory(it list.Item) string {
-	switch v := it.(type) {
-	case occItem:
-		return v.ev.Category
-	case groupItem:
-		return v.g.Category
-	}
-	return ""
-}
-
 // pickerCounts は最上位フレームの items を軸の値ごとに数える（パネルの件数表示用）。
 // status の group 行は複数 status を持ち得るため、各 status へ 1 ずつ加算する。
 func (m Model) pickerCounts(field string) map[string]int {
 	counts := make(map[string]int)
 	for _, it := range m.top().items {
+		ei, ok := it.(eventItem)
+		if !ok {
+			continue
+		}
 		switch field {
 		case "cat":
-			counts[itemCategory(it)]++
+			counts[ei.category()]++
 		case "st":
-			switch v := it.(type) {
-			case occItem:
-				counts[v.ev.StatusCode]++
-			case groupItem:
-				for k := range v.g.StatusCounts {
-					counts[k]++
-				}
+			for _, s := range ei.statusCodes() {
+				counts[s]++
 			}
 		}
 	}
