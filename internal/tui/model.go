@@ -102,6 +102,8 @@ type Model struct {
 
 	showResolved bool // 影響リソース一覧で RESOLVED も表示するか（既定 false=非表示）
 
+	flash string // 一時メッセージ（CSV エクスポート結果など）。ページ移動でクリア。
+
 	state    map[string]*occState // key=代表ARN
 	quitting bool
 }

@@ -71,7 +71,7 @@ phd events --tui
 phd events --tui --group-by type
 ```
 
-- **3ページ構成**: 一覧 → `Enter` で**詳細**（メタ＋説明 latestDescription）→ さらに `Enter` で**影響リソース一覧**（独立ページ）。影響リソースは**アカウント順にソート**し、**既定で RESOLVED を非表示**（`a` で全表示トグル、RESOLVED 行は薄色）。詳細の見出し直下には eventMetadata の人間可読な説明（例「AWS Lambda end of support for Python 3.9」）を表示。詳細・リソースは入場時に遅延ロード（裏で `DescribeEventDetails` / `DescribeAffectedEntities`）。
+- **3ページ構成**: 一覧 → `Enter` で**詳細**（メタ＋説明 latestDescription）→ さらに `Enter` で**影響リソース一覧**（独立ページ）。影響リソースは**アカウント順にソート**し、**既定で RESOLVED を非表示**（`a` で全表示トグル、RESOLVED 行は薄色）。影響リソース一覧で `e` を押すと、**現在表示中のリソースを CSV にエクスポート**（カレントに `phd-resources-<timestamp>.csv` を自動命名で保存。`a` で表示を切り替えた内容がそのまま反映される）。詳細の見出し直下には eventMetadata の人間可読な説明（例「AWS Lambda end of support for Python 3.9」）を表示。詳細・リソースは入場時に遅延ロード（裏で `DescribeEventDetails` / `DescribeAffectedEntities`）。
 - **Esc / Backspace** で1階層戻る（カーソル位置は復元）。`/` でインクリメンタル絞り込み、`q` で終了。
 - 取得条件は CLI と同じ（`--status` `--within` `--service` `--scope` など全フラグが効く）。`--tui` 時は `--format` / `--output` は無視。
 - リソースは初回だけ API を叩き、2回目以降はキャッシュで即時。org スコープではアカウント名（`名前 (ID)`）も解決する。
@@ -82,6 +82,7 @@ phd events --tui --group-by type
 | `Enter`, `l` | 1階層下へ（一覧→詳細→影響リソース一覧） |
 | `Esc`, `Backspace`, `h` | 1階層戻る |
 | `a` | （影響リソース一覧で）RESOLVED の表示/非表示を切替 |
+| `e` | （影響リソース一覧で）現在表示中のリソースを CSV にエクスポート（カレントに自動命名で保存） |
 | `/` | 一覧の絞り込み（下記の構文） |
 | `c` | category チェックボックス選択（4値固定 enum） |
 | `s` | status チェックボックス選択（open/upcoming/closed） |

@@ -171,7 +171,14 @@ func (m Model) resourcesView() string {
 	if m.showResolved {
 		toggle = "a: hide resolved"
 	}
-	footer := footerStyle.Render("↑/↓: scroll   " + toggle + "   esc/⌫: back   q: quit" + loading)
+	footer := footerStyle.Render("↑/↓: scroll   " + toggle + "   e: export csv   esc/⌫: back   q: quit" + loading)
+	if m.flash != "" {
+		style := footerStyle
+		if strings.HasPrefix(m.flash, "export failed") || strings.HasPrefix(m.flash, "(no resources") {
+			style = errStyle
+		}
+		footer += footerStyle.Render("   — ") + style.Render(m.flash)
+	}
 	return header + "\n" + m.detail.View() + "\n" + footer
 }
 

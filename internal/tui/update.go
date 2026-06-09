@@ -161,6 +161,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.showResolved = !m.showResolved
 			m.detail.SetContent(m.resourcesContent(m.state[m.top().occKey]))
 			return m, nil
+		case "e":
+			// 現在表示中（visible）のリソースを CSV にエクスポート。
+			return m.exportResources()
 		case "esc", "backspace", "left", "h":
 			return m.goBack()
 		default:
@@ -287,6 +290,7 @@ func (m *Model) enterDetail(key string, ev model.LogicalEvent) tea.Cmd {
 // リソースは詳細入場時に既にロード中/済みなので、ここでは表示するだけ。
 func (m Model) drillToResources() (tea.Model, tea.Cmd) {
 	t := m.top()
+	m.flash = "" // ページ移動でエクスポート結果メッセージをクリア
 	m.stack = append(m.stack, frame{
 		level:  levelResources,
 		title:  t.title,
@@ -344,6 +348,7 @@ func (m Model) goBack() (tea.Model, tea.Cmd) {
 	if len(m.stack) <= 1 {
 		return m, nil
 	}
+	m.flash = "" // ページ移動でエクスポート結果メッセージをクリア
 	m.stack = m.stack[:len(m.stack)-1]
 	m.syncListFromTop() // 一覧階層なら list を同期（detail/resources では no-op）
 	m.showCurrentPage() // detail/resources に戻ったら該当ページを再描画
