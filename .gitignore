@@ -31,6 +31,11 @@ config.local.yaml
 .env
 .env.*
 
+# === TUI からの CSV エクスポート（ローカル出力・コミット対象外） ===
+# `e` で生成: phd-resources-<timestamp>.csv / phd-events-<timestamp>.csv（衝突時は -2 等）
+phd-resources-*.csv
+phd-events-*.csv
+
 # === Claude Code（個人ローカル設定のみ除外） ===
 # commands/ など共有資産は追跡する。
 .claude/settings.local.json
