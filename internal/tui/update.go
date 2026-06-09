@@ -142,6 +142,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case "enter", "l", "right":
 			return m.drillToResources() // 影響リソース一覧（3ページ目）へ
+		case "r":
+			return m.refreshCurrent() // キャッシュ無視で現 occurrence を再取得
 		case "esc", "backspace", "left", "h":
 			return m.goBack()
 		default:
@@ -164,6 +166,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "e":
 			// 現在表示中（visible）のリソースを CSV にエクスポート。
 			return m.exportResources()
+		case "r":
+			return m.refreshCurrent() // キャッシュ無視で現 occurrence を再取得
 		case "esc", "backspace", "left", "h":
 			return m.goBack()
 		default:
@@ -181,6 +185,10 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.openPicker(&categoryPicker)
 	case "s":
 		return m.openPicker(&statusPicker)
+	case "g":
+		return m.cycleGroupBy()
+	case "e":
+		return m.exportVisibleEvents()
 	case "/":
 		// フィルタ入力を開始。入力欄には確定済みの自由語が入っている（enum チップは status line）。
 		m.filtering = true
@@ -214,6 +222,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // drillDown は現階層の選択行を確定して 1 階層下へ進む。
 // levelOccs→levelDetail のときは詳細・リソースの遅延ロードを発火する。
 func (m Model) drillDown() (tea.Model, tea.Cmd) {
+	m.flash = "" // ページ移動でエクスポート/リフレッシュのメッセージをクリア
 	t := m.top()
 	switch t.level {
 	case levelGroups:
@@ -352,6 +361,48 @@ func (m Model) goBack() (tea.Model, tea.Cmd) {
 	m.stack = m.stack[:len(m.stack)-1]
 	m.syncListFromTop() // 一覧階層なら list を同期（detail/resources では no-op）
 	m.showCurrentPage() // detail/resources に戻ったら該当ページを再描画
+	return m, nil
+}
+
+// refreshCurrent はキャッシュを破棄して現在の occurrence の詳細・影響リソースを再取得する。
+// ディスクキャッシュ全体を Clear するが、即時に再取得するのは現 occurrence のみ
+// （他は次回アクセス時に遅延再取得）。一覧では Query を持たないため無効＝詳細/リソースページ専用。
+func (m Model) refreshCurrent() (tea.Model, tea.Cmd) {
+	t := m.top()
+	key := t.occKey
+	if key == "" {
+		m.flash = "(cannot refresh)"
+		return m, nil
+	}
+	_ = m.in.Cache.Clear()
+	m.state[key] = &occState{}       // stateNone に戻す
+	cmd := m.enterDetail(key, t.occ) // detail+resources を再フェッチ（loading 表示）
+	m.showCurrentPage()              // 現在の level（detail/resources）に合わせて再描画
+	m.flash = "refreshing…"
+	return m, cmd
+}
+
+// cycleGroupBy はルート階層で grouping を none → type → topic → none と循環させる。
+func (m Model) cycleGroupBy() (tea.Model, tea.Cmd) {
+	if len(m.stack) != 1 {
+		m.flash = "(g works at top level)"
+		return m, nil
+	}
+	switch m.groupBy {
+	case "":
+		m.groupBy = "type"
+	case "type":
+		m.groupBy = "topic"
+	default:
+		m.groupBy = ""
+	}
+	m.stack = []frame{m.rootFrame()}
+	m.syncListFromTop()
+	label := m.groupBy
+	if label == "" {
+		label = "none"
+	}
+	m.flash = "group: " + label
 	return m, nil
 }
 

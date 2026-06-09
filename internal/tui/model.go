@@ -85,6 +85,8 @@ type Model struct {
 
 	accountNames map[string]string // org の ID→名前（遅延取得）
 
+	groupBy string // "" | "type" | "topic"。g キーで実行時に切替（初期値は in.GroupBy）
+
 	stack  []frame
 	width  int
 	height int
@@ -131,6 +133,7 @@ func New(ctx context.Context, in *Input) Model {
 		detail:  viewport.New(80, 18),
 		spinner: sp,
 		fi:      ti,
+		groupBy: in.GroupBy,
 		state:   make(map[string]*occState),
 	}
 	m.stack = []frame{m.rootFrame()}
@@ -140,9 +143,9 @@ func New(ctx context.Context, in *Input) Model {
 
 // rootFrame は GroupBy に応じてルート階層（group 一覧 or occurrence 一覧）を作る。
 func (m *Model) rootFrame() frame {
-	if m.in.GroupBy == "type" || m.in.GroupBy == "topic" {
+	if m.groupBy == "type" || m.groupBy == "topic" {
 		var groups []model.EventGroup
-		topic := m.in.GroupBy == "topic"
+		topic := m.groupBy == "topic"
 		if topic {
 			groups = group.ByTopic(m.in.Events)
 		} else {
@@ -152,7 +155,7 @@ func (m *Model) rootFrame() frame {
 		for _, g := range groups {
 			items = append(items, groupItem{g: g, topic: topic, now: m.now})
 		}
-		return frame{level: levelGroups, title: groupNoun(m.in.GroupBy), items: items}
+		return frame{level: levelGroups, title: groupNoun(m.groupBy), items: items}
 	}
 	items := make([]list.Item, 0, len(m.in.Events))
 	for _, e := range m.in.Events {

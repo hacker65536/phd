@@ -14,8 +14,10 @@ import (
 
 func TestExportFilename(t *testing.T) {
 	now := time.Date(2026, 6, 10, 15, 30, 12, 0, time.UTC)
-	got := exportFilename(now)
-	if want := "phd-resources-20260610-153012.csv"; got != want {
+	if got, want := exportFilename("phd-resources", now), "phd-resources-20260610-153012.csv"; got != want {
+		t.Fatalf("exportFilename = %q, want %q", got, want)
+	}
+	if got, want := exportFilename("phd-events", now), "phd-events-20260610-153012.csv"; got != want {
 		t.Fatalf("exportFilename = %q, want %q", got, want)
 	}
 }

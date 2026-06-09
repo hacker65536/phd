@@ -6,9 +6,26 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
+
 	"phd/internal/model"
 	"phd/internal/render"
 )
+
+// statusStyle は status コード別の表示スタイルを返す（一覧の色分け用）。
+// open=黄(対応中), upcoming=シアン(予定), closed=薄色。未知はデフォルト。
+func statusStyle(code string) lipgloss.Style {
+	switch strings.ToLower(code) {
+	case "open":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("11"))
+	case "upcoming":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
+	case "closed":
+		return lipgloss.NewStyle().Faint(true)
+	default:
+		return lipgloss.NewStyle()
+	}
+}
 
 // occItem は occurrence 一覧の 1 行（list.Item 実装）。
 type occItem struct {
@@ -17,7 +34,9 @@ type occItem struct {
 }
 
 func (i occItem) Title() string {
-	t := fmt.Sprintf("%-8s  %-9s  %s", i.ev.Service, i.ev.StatusCode, i.ev.EventTypeCode)
+	// status は色分け（幅は Render 前にパディングして整列を保つ）。
+	status := statusStyle(i.ev.StatusCode).Render(fmt.Sprintf("%-9s", i.ev.StatusCode))
+	t := fmt.Sprintf("%-8s  %s  %s", i.ev.Service, status, i.ev.EventTypeCode)
 	return t + eolSuffix(i.ev.EventTypeCode)
 }
 

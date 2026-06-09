@@ -31,6 +31,22 @@ var (
 	resolvedStyle = lipgloss.NewStyle().Faint(true)
 )
 
+// flashStyle は一時メッセージの表示スタイル。エラー系（"(" 始まり or "export failed"）は赤。
+func flashStyle(s string) lipgloss.Style {
+	if strings.HasPrefix(s, "export failed") || strings.HasPrefix(s, "(") {
+		return errStyle
+	}
+	return footerStyle
+}
+
+// withFlash はフッタ行末尾に m.flash を付与する（無ければそのまま）。
+func (m Model) withFlash(footer string) string {
+	if m.flash == "" {
+		return footer
+	}
+	return footer + footerStyle.Render("   — ") + flashStyle(m.flash).Render(m.flash)
+}
+
 // View はトップフレームの階層に応じて一覧 / 詳細 / 影響リソース一覧を描画する。
 func (m Model) View() string {
 	if m.quitting {
@@ -63,7 +79,7 @@ func (m Model) listView() string {
 	if m.catStatusShown() {
 		parts = append(parts, m.catStatusLine())
 	}
-	parts = append(parts, footerStyle.Render(m.listFooter()))
+	parts = append(parts, m.withFlash(footerStyle.Render(m.listFooter())))
 	return strings.Join(parts, "\n")
 }
 
@@ -110,7 +126,7 @@ func (m Model) listFooter() string {
 	if len(m.stack) > 1 {
 		depth = "  esc: clear/back"
 	}
-	return "↑/↓: move   enter: drill down" + depth + "   /: filter   c: category   s: status   q: quit"
+	return "↑/↓: move   enter: drill down" + depth + "   /: filter   c: category   s: status   g: group   e: export   q: quit"
 }
 
 // pickerView は category / status のチェックボックス選択パネルを描画する。
@@ -137,7 +153,7 @@ func (m Model) detailView() string {
 	t := m.top()
 	header := headerStyle.Render("▼ " + t.title)
 	footer := footerStyle.Render(m.detailFooter())
-	return header + "\n" + m.detail.View() + "\n" + footer
+	return header + "\n" + m.detail.View() + "\n" + m.withFlash(footer)
 }
 
 func (m Model) detailFooter() string {
@@ -146,7 +162,7 @@ func (m Model) detailFooter() string {
 	if st != nil && (st.dState == stateLoading || st.rState == stateLoading) {
 		loading = "  " + m.spinner.View() + " loading…"
 	}
-	return "↑/↓: scroll   enter: resources   esc/⌫: back   q: quit" + loading
+	return "↑/↓: scroll   enter: resources   r: refresh   esc/⌫: back   q: quit" + loading
 }
 
 // resourcesView は影響リソース一覧（3ページ目）を描画する。
@@ -171,15 +187,8 @@ func (m Model) resourcesView() string {
 	if m.showResolved {
 		toggle = "a: hide resolved"
 	}
-	footer := footerStyle.Render("↑/↓: scroll   " + toggle + "   e: export csv   esc/⌫: back   q: quit" + loading)
-	if m.flash != "" {
-		style := footerStyle
-		if strings.HasPrefix(m.flash, "export failed") || strings.HasPrefix(m.flash, "(no resources") {
-			style = errStyle
-		}
-		footer += footerStyle.Render("   — ") + style.Render(m.flash)
-	}
-	return header + "\n" + m.detail.View() + "\n" + footer
+	footer := footerStyle.Render("↑/↓: scroll   " + toggle + "   e: export csv   r: refresh   esc/⌫: back   q: quit" + loading)
+	return header + "\n" + m.detail.View() + "\n" + m.withFlash(footer)
 }
 
 // detailContent は 1 occurrence の詳細（メタ情報＋説明＋影響リソース）をテキストで組み立てる。
