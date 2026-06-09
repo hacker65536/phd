@@ -488,12 +488,12 @@ func TestEOLLabelAndFilter(t *testing.T) {
 		{EventTypeCode: "AWS_LAMBDA_PLANNED_LIFECYCLE_EVENT", Service: "LAMBDA", Category: "scheduledChange", StatusCode: "open", RawEvents: []model.Event{{Arn: "a1"}}},
 		{EventTypeCode: "AWS_RDS_MAINTENANCE", Service: "RDS", Category: "scheduledChange", StatusCode: "open", RawEvents: []model.Event{{Arn: "a2"}}},
 	}
-	// Title に [EOL] が付くのは lifecycle 系だけ。
-	if got := (occItem{ev: evs[0]}).Title(); !strings.Contains(got, "[EOL]") {
-		t.Fatalf("lifecycle title = %q, want [EOL]", got)
+	// Title に EOL ラベルが付くのは lifecycle 系だけ。
+	if got := (occItem{ev: evs[0]}).Title(); !strings.Contains(got, "EOL") {
+		t.Fatalf("lifecycle title = %q, want EOL", got)
 	}
-	if got := (occItem{ev: evs[1]}).Title(); strings.Contains(got, "[EOL]") {
-		t.Fatalf("non-lifecycle title = %q, should not contain [EOL]", got)
+	if got := (occItem{ev: evs[1]}).Title(); strings.Contains(got, "EOL") {
+		t.Fatalf("non-lifecycle title = %q, should not contain EOL", got)
 	}
 	// `eol` フリーワードで lifecycle 系だけ抽出できる。
 	m := newTestModel(evs, "")

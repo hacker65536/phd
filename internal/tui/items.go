@@ -89,10 +89,13 @@ func isLifecycle(eventTypeCode string) bool {
 	return strings.HasSuffix(eventTypeCode, "_PLANNED_LIFECYCLE_EVENT")
 }
 
-// eolSuffix は lifecycle 系なら一覧に付ける軽量ラベル。
+// eolStyle は EOL ラベルの表示スタイル（廃止予告＝オレンジの太字で目立たせる）。
+var eolStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("208"))
+
+// eolSuffix は lifecycle 系なら一覧に付ける軽量ラベル（色付き EOL）。
 func eolSuffix(eventTypeCode string) string {
 	if isLifecycle(eventTypeCode) {
-		return "  [EOL]"
+		return "  " + eolStyle.Render("EOL")
 	}
 	return ""
 }
