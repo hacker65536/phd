@@ -149,11 +149,16 @@ func (m Model) pickerView() string {
 	return b.String()
 }
 
+// viewportPage は m.detail viewport を使うページ（詳細 / 影響リソース）の共通レイアウト。
+// ヘッダ＋本文＋（flash 付き）フッタを組み立てる。
+func (m Model) viewportPage(headerText, footerText string) string {
+	header := headerStyle.Render(headerText)
+	footer := m.withFlash(footerStyle.Render(footerText))
+	return header + "\n" + m.detail.View() + "\n" + footer
+}
+
 func (m Model) detailView() string {
-	t := m.top()
-	header := headerStyle.Render("▼ " + t.title)
-	footer := footerStyle.Render(m.detailFooter())
-	return header + "\n" + m.detail.View() + "\n" + m.withFlash(footer)
+	return m.viewportPage("▼ "+m.top().title, m.detailFooter())
 }
 
 func (m Model) detailFooter() string {
@@ -178,7 +183,6 @@ func (m Model) resourcesView() string {
 	if shown != total { // RESOLVED 非表示で減っているとき
 		count = fmt.Sprintf("%d/%d", shown, total)
 	}
-	header := headerStyle.Render(fmt.Sprintf("▼ %s — affected resources (%s)", t.title, count))
 	loading := ""
 	if st != nil && st.rState == stateLoading {
 		loading = "  " + m.spinner.View() + " loading…"
@@ -187,8 +191,9 @@ func (m Model) resourcesView() string {
 	if m.showResolved {
 		toggle = "a: hide resolved"
 	}
-	footer := footerStyle.Render("↑/↓: scroll   " + toggle + "   e: export csv   r: refresh   esc/⌫: back   q: quit" + loading)
-	return header + "\n" + m.detail.View() + "\n" + m.withFlash(footer)
+	headerText := fmt.Sprintf("▼ %s — affected resources (%s)", t.title, count)
+	footerText := "↑/↓: scroll   " + toggle + "   e: export csv   r: refresh   esc/⌫: back   q: quit" + loading
+	return m.viewportPage(headerText, footerText)
 }
 
 // detailContent は 1 occurrence の詳細（メタ情報＋説明＋影響リソース）をテキストで組み立てる。
