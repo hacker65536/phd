@@ -50,7 +50,7 @@ func CSV(w io.Writer, events []model.LogicalEvent) error {
 	for _, e := range events {
 		base := []string{
 			e.EventTypeCode, e.Service, e.StatusCode, e.Category,
-			strings.Join(e.Regions, " "), formatTime(e.StartTime), formatTime(e.EndTime),
+			strings.Join(e.Regions, " "), FormatTime(e.StartTime), FormatTime(e.EndTime),
 		}
 		if len(e.Resources) == 0 {
 			if err := cw.Write(append(base, "", "", "", "", "")); err != nil {
@@ -74,8 +74,8 @@ func Markdown(w io.Writer, events []model.LogicalEvent, now time.Time, showDetai
 	fmt.Fprintln(w, "|---|---|---|---|---|---|---|---:|---:|")
 	for _, e := range events {
 		fmt.Fprintf(w, "| %s | %s | %s | %s | %s | %s | %s | %d | %d |\n",
-			e.Service, e.StatusCode, countdown(e.StatusCode, e.StartTime, now), formatTime(e.StartTime),
-			e.EventTypeCode, e.Category, joinRegions(e.Regions), len(e.Accounts), len(e.Resources))
+			e.Service, e.StatusCode, Countdown(e.StatusCode, e.StartTime, now), FormatTime(e.StartTime),
+			e.EventTypeCode, e.Category, JoinRegions(e.Regions), len(e.Accounts), len(e.Resources))
 	}
 	if !showDetails && !showResources {
 		return
@@ -85,7 +85,7 @@ func Markdown(w io.Writer, events []model.LogicalEvent, now time.Time, showDetai
 			continue
 		}
 		fmt.Fprintf(w, "\n#### %s [%s] %s — start %s (%s)\n\n",
-			e.EventTypeCode, e.Service, e.StatusCode, formatTime(e.StartTime), countdown(e.StatusCode, e.StartTime, now))
+			e.EventTypeCode, e.Service, e.StatusCode, FormatTime(e.StartTime), Countdown(e.StatusCode, e.StartTime, now))
 		if showDetails && e.Description != "" {
 			fmt.Fprintf(w, "%s\n", e.Description)
 		}
@@ -95,7 +95,7 @@ func Markdown(w io.Writer, events []model.LogicalEvent, now time.Time, showDetai
 		fmt.Fprintf(w, "\n| ACCOUNT | REGION | RESOURCE | STATUS |\n")
 		fmt.Fprintln(w, "|---|---|---|---|")
 		for _, r := range e.Resources {
-			fmt.Fprintf(w, "| %s | %s | %s | %s |\n", accountLabel(r), r.Region, r.Value, orDash(r.Status))
+			fmt.Fprintf(w, "| %s | %s | %s | %s |\n", AccountLabel(r), r.Region, r.Value, OrDash(r.Status))
 		}
 	}
 }

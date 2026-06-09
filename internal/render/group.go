@@ -44,14 +44,14 @@ func GroupTable(w io.Writer, groups []model.EventGroup, now time.Time, topicMode
 	for _, g := range groups {
 		fmt.Fprintf(tw, "%s\t%s\t%s\t%d\t%s\t%s\t%d\t%d\t%s\n",
 			g.Service,
-			statusSummary(g.StatusCounts),
-			countdown(g.NextStatus, g.NextStart, now),
+			StatusSummary(g.StatusCounts),
+			Countdown(g.NextStatus, g.NextStart, now),
 			g.OccurrenceCount,
-			joinRegions(g.Regions),
+			JoinRegions(g.Regions),
 			g.Category,
 			g.AccountCount,
 			g.ResourceCount,
-			groupLabel(g, topicMode),
+			GroupLabel(g, topicMode),
 		)
 	}
 	tw.Flush()
@@ -67,8 +67,8 @@ func GroupTable(w io.Writer, groups []model.EventGroup, now time.Time, topicMode
 			continue
 		}
 		fmt.Fprintf(w, "\n▼ %s [%s] %s — %d occurrence(s), next %s\n",
-			groupLabel(g, topicMode), g.Service, statusSummary(g.StatusCounts), g.OccurrenceCount,
-			countdown(g.NextStatus, g.NextStart, now))
+			GroupLabel(g, topicMode), g.Service, StatusSummary(g.StatusCounts), g.OccurrenceCount,
+			Countdown(g.NextStatus, g.NextStart, now))
 		if topicMode && g.Topic != "" {
 			fmt.Fprintf(w, "  eventTypeCode: %s\n", g.EventTypeCode)
 		}
@@ -80,8 +80,8 @@ func GroupTable(w io.Writer, groups []model.EventGroup, now time.Time, topicMode
 			fmt.Fprintln(ot, "  STATUS\tIN\tSTART\tREGIONS\tACCT\tRES")
 			for _, o := range g.Occurrences {
 				fmt.Fprintf(ot, "  %s\t%s\t%s\t%s\t%d\t%d\n",
-					o.StatusCode, countdown(o.StatusCode, o.StartTime, now), formatTime(o.StartTime),
-					joinRegions(o.Regions), len(o.Accounts), len(o.Resources))
+					o.StatusCode, Countdown(o.StatusCode, o.StartTime, now), FormatTime(o.StartTime),
+					JoinRegions(o.Regions), len(o.Accounts), len(o.Resources))
 			}
 			ot.Flush()
 		}
@@ -90,15 +90,15 @@ func GroupTable(w io.Writer, groups []model.EventGroup, now time.Time, topicMode
 			rt := tabwriter.NewWriter(w, 0, 2, 2, ' ', 0)
 			fmt.Fprintln(rt, "  ACCOUNT\tREGION\tRESOURCE\tSTATUS")
 			for _, r := range g.Resources {
-				fmt.Fprintf(rt, "  %s\t%s\t%s\t%s\n", accountLabel(r), r.Region, r.Value, orDash(r.Status))
+				fmt.Fprintf(rt, "  %s\t%s\t%s\t%s\n", AccountLabel(r), r.Region, r.Value, OrDash(r.Status))
 			}
 			rt.Flush()
 		}
 	}
 }
 
-// groupLabel は表示ラベル（topicMode なら話題ラベル、無ければ eventTypeCode）。
-func groupLabel(g model.EventGroup, topicMode bool) string {
+// GroupLabel は表示ラベル（topicMode なら話題ラベル、無ければ eventTypeCode）。
+func GroupLabel(g model.EventGroup, topicMode bool) string {
 	if topicMode && g.Topic != "" {
 		return g.Topic
 	}
@@ -115,8 +115,8 @@ func GroupMarkdown(w io.Writer, groups []model.EventGroup, now time.Time, topicM
 	fmt.Fprintln(w, "|---|---|---|---:|---|---|---:|---:|---|")
 	for _, g := range groups {
 		fmt.Fprintf(w, "| %s | %s | %s | %d | %s | %s | %d | %d | %s |\n",
-			g.Service, statusSummary(g.StatusCounts), countdown(g.NextStatus, g.NextStart, now),
-			g.OccurrenceCount, joinRegions(g.Regions), g.Category, g.AccountCount, g.ResourceCount, groupLabel(g, topicMode))
+			g.Service, StatusSummary(g.StatusCounts), Countdown(g.NextStatus, g.NextStart, now),
+			g.OccurrenceCount, JoinRegions(g.Regions), g.Category, g.AccountCount, g.ResourceCount, GroupLabel(g, topicMode))
 	}
 }
 
@@ -128,14 +128,14 @@ func groupCSV(w io.Writer, groups []model.EventGroup, now time.Time, topicMode b
 	fmt.Fprintf(w, "Service,Status,Next,Occurrences,Regions,Category,Accounts,Resources,%s\n", head)
 	for _, g := range groups {
 		fmt.Fprintf(w, "%s,%s,%s,%d,%s,%s,%d,%d,%q\n",
-			g.Service, statusSummary(g.StatusCounts), countdown(g.NextStatus, g.NextStart, now),
-			g.OccurrenceCount, strings.Join(g.Regions, " "), g.Category, g.AccountCount, g.ResourceCount, groupLabel(g, topicMode))
+			g.Service, StatusSummary(g.StatusCounts), Countdown(g.NextStatus, g.NextStart, now),
+			g.OccurrenceCount, strings.Join(g.Regions, " "), g.Category, g.AccountCount, g.ResourceCount, GroupLabel(g, topicMode))
 	}
 	return nil
 }
 
-// statusSummary は status 件数を深刻度順に "open:2 upcoming:5" のように整形する。
-func statusSummary(counts map[string]int) string {
+// StatusSummary は status 件数を深刻度順に "open:2 upcoming:5" のように整形する。
+func StatusSummary(counts map[string]int) string {
 	type kv struct {
 		s string
 		n int

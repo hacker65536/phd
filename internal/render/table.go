@@ -21,11 +21,11 @@ func Table(w io.Writer, events []model.LogicalEvent, now time.Time, showDetails,
 		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d\t%d\n",
 			e.Service,
 			e.StatusCode,
-			countdown(e.StatusCode, e.StartTime, now),
-			formatTime(e.StartTime),
+			Countdown(e.StatusCode, e.StartTime, now),
+			FormatTime(e.StartTime),
 			e.EventTypeCode,
 			e.Category,
-			joinRegions(e.Regions),
+			JoinRegions(e.Regions),
 			len(e.Accounts),
 			len(e.Resources),
 		)
@@ -40,7 +40,7 @@ func Table(w io.Writer, events []model.LogicalEvent, now time.Time, showDetails,
 			continue
 		}
 		fmt.Fprintf(w, "\n▼ %s [%s] %s  start=%s (%s)\n",
-			e.EventTypeCode, e.Service, e.StatusCode, formatTime(e.StartTime), countdown(e.StatusCode, e.StartTime, now))
+			e.EventTypeCode, e.Service, e.StatusCode, FormatTime(e.StartTime), Countdown(e.StatusCode, e.StartTime, now))
 		if showDetails && e.Description != "" {
 			fmt.Fprintln(w, indent(e.Description, "    "))
 		}
@@ -51,7 +51,7 @@ func Table(w io.Writer, events []model.LogicalEvent, now time.Time, showDetails,
 		rt := tabwriter.NewWriter(w, 0, 2, 2, ' ', 0)
 		fmt.Fprintln(rt, "  ACCOUNT\tREGION\tRESOURCE\tSTATUS")
 		for _, r := range e.Resources {
-			fmt.Fprintf(rt, "  %s\t%s\t%s\t%s\n", accountLabel(r), r.Region, r.Value, orDash(r.Status))
+			fmt.Fprintf(rt, "  %s\t%s\t%s\t%s\n", AccountLabel(r), r.Region, r.Value, OrDash(r.Status))
 		}
 		rt.Flush()
 	}
@@ -67,16 +67,29 @@ func SetDisplayLocation(loc *time.Location) {
 	}
 }
 
-// formatDate は日付のみ "2006-01-02"（displayLoc）で整形する（ゼロ値は "-"）。
-func formatDate(t time.Time) string {
+// ZoneAbbrev は t を表示タイムゾーンに変換したときのゾーン略称（"UTC"/"JST" 等）を返す。
+func ZoneAbbrev(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.In(displayLoc).Format("MST")
+}
+
+// ZoneName は現在の表示タイムゾーン名（"UTC"/"Local"/"Asia/Tokyo" 等）。
+func ZoneName() string {
+	return displayLoc.String()
+}
+
+// FormatDate は日付のみ "2006-01-02"（displayLoc）で整形する（ゼロ値は "-"）。
+func FormatDate(t time.Time) string {
 	if t.IsZero() {
 		return "-"
 	}
 	return t.In(displayLoc).Format("2006-01-02")
 }
 
-// countdown は開始までの残り時間を短く表す。進行中/開始済みは "ongoing"/"started"。
-func countdown(status string, start, now time.Time) string {
+// Countdown は開始までの残り時間を短く表す。進行中/開始済みは "ongoing"/"started"。
+func Countdown(status string, start, now time.Time) string {
 	if status == "open" {
 		return "ongoing"
 	}
@@ -106,28 +119,28 @@ func indent(s, pad string) string {
 	return strings.Join(lines, "\n")
 }
 
-func joinRegions(regions []string) string {
+func JoinRegions(regions []string) string {
 	if len(regions) == 0 {
 		return "-"
 	}
 	return strings.Join(regions, ",")
 }
 
-func formatTime(t time.Time) string {
+func FormatTime(t time.Time) string {
 	if t.IsZero() {
 		return "-"
 	}
 	return t.In(displayLoc).Format("2006-01-02 15:04")
 }
 
-func orDash(s string) string {
+func OrDash(s string) string {
 	if s == "" {
 		return "-"
 	}
 	return s
 }
 
-func accountLabel(r model.Resource) string {
+func AccountLabel(r model.Resource) string {
 	switch {
 	case r.AccountName != "" && r.AccountID != "":
 		return fmt.Sprintf("%s (%s)", r.AccountName, r.AccountID)
