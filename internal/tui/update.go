@@ -6,7 +6,7 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"phd/internal/model"
+	"github.com/hacker65536/phd/internal/model"
 )
 
 // Update は Bubble Tea のメッセージループ。

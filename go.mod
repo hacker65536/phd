@@ -1,4 +1,4 @@
-module phd
+module github.com/hacker65536/phd
 
 go 1.26.4
 

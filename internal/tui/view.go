@@ -9,9 +9,9 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"phd/internal/enrich"
-	"phd/internal/model"
-	"phd/internal/render"
+	"github.com/hacker65536/phd/internal/enrich"
+	"github.com/hacker65536/phd/internal/model"
+	"github.com/hacker65536/phd/internal/render"
 )
 
 var (

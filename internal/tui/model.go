@@ -15,10 +15,10 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"phd/internal/cache"
-	"phd/internal/group"
-	"phd/internal/health"
-	"phd/internal/model"
+	"github.com/hacker65536/phd/internal/cache"
+	"github.com/hacker65536/phd/internal/group"
+	"github.com/hacker65536/phd/internal/health"
+	"github.com/hacker65536/phd/internal/model"
 )
 
 // Input は main から渡す TUI の入力一式。enrich 前の論理イベントと、

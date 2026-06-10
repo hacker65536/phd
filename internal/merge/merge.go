@@ -5,7 +5,7 @@ import (
 	"sort"
 	"time"
 
-	"phd/internal/model"
+	"github.com/hacker65536/phd/internal/model"
 )
 
 // statusSeverity は status の深刻度。混在時の代表値選択に使う。

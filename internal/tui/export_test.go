@@ -9,7 +9,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"phd/internal/model"
+	"github.com/hacker65536/phd/internal/model"
 )
 
 func TestExportFilename(t *testing.T) {

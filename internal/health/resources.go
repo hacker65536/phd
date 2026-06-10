@@ -8,8 +8,8 @@ import (
 	awshealth "github.com/aws/aws-sdk-go-v2/service/health"
 	htypes "github.com/aws/aws-sdk-go-v2/service/health/types"
 
-	"phd/internal/cache"
-	"phd/internal/model"
+	"github.com/hacker65536/phd/internal/cache"
+	"github.com/hacker65536/phd/internal/model"
 )
 
 // FetchResources は単一イベント（ARN）の影響リソースを取得する。

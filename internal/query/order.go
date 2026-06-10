@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"phd/internal/model"
+	"github.com/hacker65536/phd/internal/model"
 )
 
 // statusRank はアクション優先度。進行中(open) を最優先、次に予定(upcoming)、済み(closed)。

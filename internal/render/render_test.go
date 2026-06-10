@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"phd/internal/model"
+	"github.com/hacker65536/phd/internal/model"
 )
 
 func sample() []model.LogicalEvent {

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"phd/internal/model"
+	"github.com/hacker65536/phd/internal/model"
 )
 
 // Render は指定フォーマットで論理イベントを出力する。

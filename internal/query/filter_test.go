@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"phd/internal/model"
+	"github.com/hacker65536/phd/internal/model"
 )
 
 func TestApply_FiltersByServiceAndStatus(t *testing.T) {

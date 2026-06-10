@@ -8,8 +8,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"phd/internal/model"
-	"phd/internal/render"
+	"github.com/hacker65536/phd/internal/model"
+	"github.com/hacker65536/phd/internal/render"
 )
 
 // exportFilename は CSV エクスポート時の自動命名（prefix＋タイムスタンプ）を返す。

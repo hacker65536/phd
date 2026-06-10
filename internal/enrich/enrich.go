@@ -9,8 +9,8 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"phd/internal/health"
-	"phd/internal/model"
+	"github.com/hacker65536/phd/internal/health"
+	"github.com/hacker65536/phd/internal/model"
 )
 
 // maxConcurrency は影響リソース取得の同時実行数の上限（Health の 429 を避けるため控えめに）。

@@ -11,8 +11,8 @@ import (
 	htypes "github.com/aws/aws-sdk-go-v2/service/health/types"
 	"golang.org/x/time/rate"
 
-	"phd/internal/cache"
-	"phd/internal/model"
+	"github.com/hacker65536/phd/internal/cache"
+	"github.com/hacker65536/phd/internal/model"
 )
 
 // rateLimit は Health API への送信レート上限（req/s）。アダプティブ・リトライと合わせて

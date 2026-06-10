@@ -8,8 +8,8 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"phd/internal/model"
-	"phd/internal/render"
+	"github.com/hacker65536/phd/internal/model"
+	"github.com/hacker65536/phd/internal/render"
 )
 
 // statusStyle は status コード別の表示スタイルを返す（一覧の色分け用）。

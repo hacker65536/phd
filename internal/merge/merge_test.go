@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"phd/internal/model"
+	"github.com/hacker65536/phd/internal/model"
 )
 
 func ev(code, region, status string, start time.Time) model.Event {

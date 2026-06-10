@@ -9,7 +9,7 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"phd/internal/model"
+	"github.com/hacker65536/phd/internal/model"
 )
 
 // RenderGroups は eventTypeCode/topic 単位のロールアップを出力する。

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"phd/internal/model"
+	"github.com/hacker65536/phd/internal/model"
 )
 
 // Filter は生イベントへの絞り込み条件。空フィールドは無視される。

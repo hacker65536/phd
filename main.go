@@ -15,17 +15,17 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"phd/internal/awsx"
-	"phd/internal/cache"
-	"phd/internal/enrich"
-	"phd/internal/group"
-	"phd/internal/health"
-	"phd/internal/merge"
-	"phd/internal/model"
-	"phd/internal/orgs"
-	"phd/internal/query"
-	"phd/internal/render"
-	"phd/internal/tui"
+	"github.com/hacker65536/phd/internal/awsx"
+	"github.com/hacker65536/phd/internal/cache"
+	"github.com/hacker65536/phd/internal/enrich"
+	"github.com/hacker65536/phd/internal/group"
+	"github.com/hacker65536/phd/internal/health"
+	"github.com/hacker65536/phd/internal/merge"
+	"github.com/hacker65536/phd/internal/model"
+	"github.com/hacker65536/phd/internal/orgs"
+	"github.com/hacker65536/phd/internal/query"
+	"github.com/hacker65536/phd/internal/render"
+	"github.com/hacker65536/phd/internal/tui"
 )
 
 // ビルド時のバージョン情報。goreleaser / `go build -ldflags "-X main.version=..."` で上書きされる。

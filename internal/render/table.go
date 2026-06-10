@@ -8,7 +8,7 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"phd/internal/model"
+	"github.com/hacker65536/phd/internal/model"
 )
 
 // Table はマージ済みイベントを tabwriter のテーブルで出力する。

@@ -3,10 +3,10 @@ package tui
 import (
 	tea "github.com/charmbracelet/bubbletea"
 
-	"phd/internal/cache"
-	"phd/internal/health"
-	"phd/internal/model"
-	"phd/internal/orgs"
+	"github.com/hacker65536/phd/internal/cache"
+	"github.com/hacker65536/phd/internal/health"
+	"github.com/hacker65536/phd/internal/model"
+	"github.com/hacker65536/phd/internal/orgs"
 )
 
 // 遅延ロードの到着メッセージ。AWS 呼び出しは全て tea.Cmd（下記）の中に隔離し、

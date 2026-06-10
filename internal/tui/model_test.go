@@ -8,8 +8,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"phd/internal/health"
-	"phd/internal/model"
+	"github.com/hacker65536/phd/internal/health"
+	"github.com/hacker65536/phd/internal/model"
 )
 
 func sampleOccs() []model.LogicalEvent {

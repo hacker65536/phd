@@ -5,7 +5,7 @@ package group
 import (
 	"sort"
 
-	"phd/internal/model"
+	"github.com/hacker65536/phd/internal/model"
 )
 
 // severity は status の深刻度（小さいほどアクション優先度が高い）。

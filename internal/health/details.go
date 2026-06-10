@@ -10,7 +10,7 @@ import (
 	htypes "github.com/aws/aws-sdk-go-v2/service/health/types"
 	"golang.org/x/sync/errgroup"
 
-	"phd/internal/cache"
+	"github.com/hacker65536/phd/internal/cache"
 )
 
 // detailBatchSize は DescribeEventDetails[ForOrganization] が 1 回で受け付けるイベント数の上限。
