@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
 	"strings"
 	"time"
 	_ "time/tzdata" // IANA タイムゾーンDBを埋め込み（--tz Asia/Tokyo 等を OS 非依存で解決）
@@ -36,6 +37,19 @@ var (
 	date    = "unknown"
 )
 
+// resolveVersion は ldflags 未注入（version=="dev"）のとき、`go install pkg@vX.Y.Z` が
+// バイナリに埋め込むモジュールバージョン（runtime/debug）にフォールバックする。
+// これにより goreleaser 経由でなくても `phd version` が意味あるバージョンを返す。
+func resolveVersion() string {
+	if version != "dev" {
+		return version
+	}
+	if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" && info.Main.Version != "(devel)" {
+		return info.Main.Version
+	}
+	return version
+}
+
 func main() {
 	if err := rootCmd().Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
@@ -47,7 +61,7 @@ func rootCmd() *cobra.Command {
 	root := &cobra.Command{
 		Use:           "phd",
 		Short:         "AWS Health Dashboard をローカルで確認する CLI",
-		Version:       version,
+		Version:       resolveVersion(),
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
@@ -64,7 +78,7 @@ func versionCmd() *cobra.Command {
 		Short: "バージョン情報を表示",
 		Run: func(cmd *cobra.Command, args []string) {
 			fmt.Printf("phd %s\n  commit: %s\n  built:  %s\n  go:     %s\n",
-				version, commit, date, runtime.Version())
+				resolveVersion(), commit, date, runtime.Version())
 		},
 	}
 }
