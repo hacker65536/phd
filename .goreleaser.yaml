@@ -1,0 +1,86 @@
+# goreleaser 設定（v2 系）。ローカル確認: `make snapshot`（= goreleaser release --snapshot --clean）
+# 本番リリース: v* タグを push すると .github/workflows/release.yml が goreleaser release を実行する。
+# 設定の妥当性確認: `goreleaser check`
+version: 2
+
+project_name: phd
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: phd
+    main: .
+    binary: phd
+    env:
+      - CGO_ENABLED=0 # 静的バイナリ（tzdata は埋め込み済みなので外部依存なし）
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    # main パッケージの version/commit/date を上書きする（`phd version` で表示）。
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+
+archives:
+  - id: phd
+    formats: [tar.gz]
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    files:
+      - LICENSE
+      - README.md
+      - config.example.yaml
+
+checksum:
+  name_template: checksums.txt
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  use: git
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
+      - "Merge pull request"
+      - "Merge branch"
+
+release:
+  draft: false
+  prerelease: auto # vX.Y.Z-rc.1 等は prerelease 扱い
+
+# Homebrew tap（cask 形式）。リリース時に goreleaser が hacker65536/homebrew-tap へ
+# Casks/phd.rb を push する。goreleaser v2.16 で brews(formula) は非推奨になり cask が後継。
+# 前提（手作業）: ① hacker65536/homebrew-tap リポジトリ（公開）を作成、
+#                ② tap へ push 権限を持つ PAT を phd repo の secret HOMEBREW_TAP_GITHUB_TOKEN に登録。
+# ユーザー側: brew install hacker65536/tap/phd
+homebrew_casks:
+  - name: phd
+    binaries:
+      - phd
+    homepage: https://github.com/hacker65536/phd
+    description: AWS Health Dashboard をローカルで確認する CLI / TUI
+    repository:
+      owner: hacker65536
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    # 未署名・未 notarize バイナリのため、インストール時に macOS の quarantine 属性を除去する
+    # （これがないと Gatekeeper に「開発元を確認できない」とブロックされる）。
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/phd"]
+          end

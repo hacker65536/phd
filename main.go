@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 	_ "time/tzdata" // IANA タイムゾーンDBを埋め込み（--tz Asia/Tokyo 等を OS 非依存で解決）
@@ -27,6 +28,14 @@ import (
 	"phd/internal/tui"
 )
 
+// ビルド時のバージョン情報。goreleaser / `go build -ldflags "-X main.version=..."` で上書きされる。
+// 素の `go build` / `go run` では下記の既定値（開発ビルド）になる。
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
+
 func main() {
 	if err := rootCmd().Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
@@ -38,11 +47,26 @@ func rootCmd() *cobra.Command {
 	root := &cobra.Command{
 		Use:           "phd",
 		Short:         "AWS Health Dashboard をローカルで確認する CLI",
+		Version:       version,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
-	root.AddCommand(eventsCmd())
+	root.SetVersionTemplate("phd {{.Version}}\n")
+	root.AddCommand(eventsCmd(), versionCmd())
 	return root
+}
+
+// versionCmd は `phd version` でバージョン・コミット・ビルド日時・Go バージョンを表示する。
+// `phd --version` は cobra 組み込みで短い形（phd <version>）を出す。
+func versionCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "version",
+		Short: "バージョン情報を表示",
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Printf("phd %s\n  commit: %s\n  built:  %s\n  go:     %s\n",
+				version, commit, date, runtime.Version())
+		},
+	}
 }
 
 type eventsOpts struct {
