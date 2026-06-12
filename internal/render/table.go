@@ -19,13 +19,13 @@ func Table(w io.Writer, events []model.LogicalEvent, now time.Time, showDetails,
 	fmt.Fprintln(tw, "SERVICE\tSTATUS\tIN\tSTART\tEVENT_TYPE\tCATEGORY\tREGIONS\tACCT\tRES")
 	for _, e := range events {
 		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d\t%d\n",
-			e.Service,
-			e.StatusCode,
+			SanitizeCell(e.Service),
+			SanitizeCell(e.StatusCode),
 			Countdown(e.StatusCode, e.StartTime, now),
 			FormatTime(e.StartTime),
-			e.EventTypeCode,
-			e.Category,
-			JoinRegions(e.Regions),
+			SanitizeCell(e.EventTypeCode),
+			SanitizeCell(e.Category),
+			SanitizeCell(JoinRegions(e.Regions)),
 			len(e.Accounts),
 			len(e.Resources),
 		)
@@ -40,9 +40,9 @@ func Table(w io.Writer, events []model.LogicalEvent, now time.Time, showDetails,
 			continue
 		}
 		fmt.Fprintf(w, "\n▼ %s [%s] %s  start=%s (%s)\n",
-			e.EventTypeCode, e.Service, e.StatusCode, FormatTime(e.StartTime), Countdown(e.StatusCode, e.StartTime, now))
+			SanitizeCell(e.EventTypeCode), SanitizeCell(e.Service), SanitizeCell(e.StatusCode), FormatTime(e.StartTime), Countdown(e.StatusCode, e.StartTime, now))
 		if showDetails && e.Description != "" {
-			fmt.Fprintln(w, indent(e.Description, "    "))
+			fmt.Fprintln(w, indent(SanitizeText(e.Description), "    "))
 		}
 		if len(e.Resources) == 0 {
 			continue
@@ -51,7 +51,7 @@ func Table(w io.Writer, events []model.LogicalEvent, now time.Time, showDetails,
 		rt := tabwriter.NewWriter(w, 0, 2, 2, ' ', 0)
 		fmt.Fprintln(rt, "  ACCOUNT\tREGION\tRESOURCE\tSTATUS")
 		for _, r := range e.Resources {
-			fmt.Fprintf(rt, "  %s\t%s\t%s\t%s\n", AccountLabel(r), r.Region, r.Value, OrDash(r.Status))
+			fmt.Fprintf(rt, "  %s\t%s\t%s\t%s\n", SanitizeCell(AccountLabel(r)), SanitizeCell(r.Region), SanitizeCell(r.Value), SanitizeCell(OrDash(r.Status)))
 		}
 		rt.Flush()
 	}

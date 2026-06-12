@@ -204,18 +204,18 @@ func (m Model) detailContent(occ model.LogicalEvent, st *occState) string {
 	// 例: "AWS Lambda end of support for Python 3.9"。遅延ロード完了後に表示。
 	if st != nil && st.dState == stateLoaded {
 		if topic := enrich.TopicLabel(st.detail.Metadata); topic != "" {
-			b.WriteString(subtitleStyle.Render(topic) + "\n\n")
+			b.WriteString(subtitleStyle.Render(render.SanitizeCell(topic)) + "\n\n")
 		}
 	}
 
 	// メタ情報（取得済みの基本フィールド）。
-	fmt.Fprintf(&b, "%s %s\n", metaKey.Render("service: "), occ.Service)
-	fmt.Fprintf(&b, "%s %s (%s)\n", metaKey.Render("status:  "), occ.StatusCode,
+	fmt.Fprintf(&b, "%s %s\n", metaKey.Render("service: "), render.SanitizeCell(occ.Service))
+	fmt.Fprintf(&b, "%s %s (%s)\n", metaKey.Render("status:  "), render.SanitizeCell(occ.StatusCode),
 		render.Countdown(occ.StatusCode, occ.StartTime, m.now))
-	fmt.Fprintf(&b, "%s %s\n", metaKey.Render("category:"), render.OrDash(occ.Category))
+	fmt.Fprintf(&b, "%s %s\n", metaKey.Render("category:"), render.SanitizeCell(render.OrDash(occ.Category)))
 	fmt.Fprintf(&b, "%s %s\n", metaKey.Render("start:   "), zonedTime(occ.StartTime))
 	fmt.Fprintf(&b, "%s %s\n", metaKey.Render("end:     "), zonedTime(occ.EndTime))
-	fmt.Fprintf(&b, "%s %s\n", metaKey.Render("regions: "), render.JoinRegions(occ.Regions))
+	fmt.Fprintf(&b, "%s %s\n", metaKey.Render("regions: "), render.SanitizeCell(render.JoinRegions(occ.Regions)))
 	b.WriteString("\n")
 
 	// 説明（遅延ロード）。
@@ -229,7 +229,7 @@ func (m Model) detailContent(occ model.LogicalEvent, st *occState) string {
 	case st.dState == stateFailed:
 		b.WriteString(errStyle.Render(fmt.Sprintf("failed: %v", st.err)) + "\n")
 	case st.detail.Description != "":
-		b.WriteString(st.detail.Description)
+		b.WriteString(render.SanitizeText(st.detail.Description))
 		b.WriteByte('\n')
 	default:
 		b.WriteString("(no description)\n")
@@ -325,7 +325,8 @@ func resourceTable(rows []model.Resource) string {
 	fmt.Fprintln(tw, "ACCOUNT\tREGION\tRESOURCE\tSTATUS")
 	for _, r := range rows {
 		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n",
-			render.AccountLabel(r), render.OrDash(r.Region), r.Value, render.OrDash(r.Status))
+			render.SanitizeCell(render.AccountLabel(r)), render.SanitizeCell(render.OrDash(r.Region)),
+			render.SanitizeCell(r.Value), render.SanitizeCell(render.OrDash(r.Status)))
 	}
 	tw.Flush()
 	lines := strings.Split(strings.TrimRight(buf.String(), "\n"), "\n")

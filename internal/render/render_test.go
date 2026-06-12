@@ -79,6 +79,34 @@ func TestCSV_DoesNotAlterSafeCells(t *testing.T) {
 	}
 }
 
+func TestSanitizeCell(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"AWS_EC2_RETIREMENT", "AWS_EC2_RETIREMENT"}, // 通常値は不変
+		{"", ""},
+		{"a\x1b[31mRED\x1b[0mb", "aREDb"},        // CSI 色コード除去
+		{"title\x1b]0;pwned\x07x", "titlex"},     // OSC タイトル書換え除去
+		{"line1\nline2\tcol", "line1 line2 col"}, // 改行・タブは空白化（1行セル）
+		{"carriage\rret", "carriage ret"},        // CR は空白化
+		{"bell\x07x\x00y", "bell x y"},           // 他の C0 制御は空白化
+		{"esc\x1bMno", "escno"},                  // ESC+@-_ の 2バイトエスケープは除去
+		{"trail\x1b", "trail "},                  // 取りこぼした単独 ESC は空白化（多層防御）
+	}
+	for _, c := range cases {
+		if got := SanitizeCell(c.in); got != c.want {
+			t.Errorf("SanitizeCell(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
+
+func TestSanitizeText_KeepsNewlinesAndTabs(t *testing.T) {
+	in := "Para 1\nLine\twith tab\n\x1b[1mbold\x1b[0m\r\nend\x00"
+	got := SanitizeText(in)
+	want := "Para 1\nLine\twith tab\nbold\nend "
+	if got != want {
+		t.Errorf("SanitizeText:\n got=%q\nwant=%q", got, want)
+	}
+}
+
 func TestJSON_RoundTrips(t *testing.T) {
 	var buf bytes.Buffer
 	if err := JSON(&buf, sample()); err != nil {

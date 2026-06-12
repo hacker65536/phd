@@ -1,10 +1,12 @@
 package render
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io"
 	"sort"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -43,15 +45,15 @@ func GroupTable(w io.Writer, groups []model.EventGroup, now time.Time, topicMode
 	}
 	for _, g := range groups {
 		fmt.Fprintf(tw, "%s\t%s\t%s\t%d\t%s\t%s\t%d\t%d\t%s\n",
-			g.Service,
+			SanitizeCell(g.Service),
 			StatusSummary(g.StatusCounts),
 			Countdown(g.NextStatus, g.NextStart, now),
 			g.OccurrenceCount,
-			JoinRegions(g.Regions),
-			g.Category,
+			SanitizeCell(JoinRegions(g.Regions)),
+			SanitizeCell(g.Category),
 			g.AccountCount,
 			g.ResourceCount,
-			GroupLabel(g, topicMode),
+			SanitizeCell(GroupLabel(g, topicMode)),
 		)
 	}
 	tw.Flush()
@@ -67,21 +69,21 @@ func GroupTable(w io.Writer, groups []model.EventGroup, now time.Time, topicMode
 			continue
 		}
 		fmt.Fprintf(w, "\n▼ %s [%s] %s — %d occurrence(s), next %s\n",
-			GroupLabel(g, topicMode), g.Service, StatusSummary(g.StatusCounts), g.OccurrenceCount,
+			SanitizeCell(GroupLabel(g, topicMode)), SanitizeCell(g.Service), StatusSummary(g.StatusCounts), g.OccurrenceCount,
 			Countdown(g.NextStatus, g.NextStart, now))
 		if topicMode && g.Topic != "" {
-			fmt.Fprintf(w, "  eventTypeCode: %s\n", g.EventTypeCode)
+			fmt.Fprintf(w, "  eventTypeCode: %s\n", SanitizeCell(g.EventTypeCode))
 		}
 		if hasDetail {
-			fmt.Fprintln(w, indent(g.Description, "    "))
+			fmt.Fprintln(w, indent(SanitizeText(g.Description), "    "))
 		}
 		if hasOcc {
 			ot := tabwriter.NewWriter(w, 0, 2, 2, ' ', 0)
 			fmt.Fprintln(ot, "  STATUS\tIN\tSTART\tREGIONS\tACCT\tRES")
 			for _, o := range g.Occurrences {
 				fmt.Fprintf(ot, "  %s\t%s\t%s\t%s\t%d\t%d\n",
-					o.StatusCode, Countdown(o.StatusCode, o.StartTime, now), FormatTime(o.StartTime),
-					JoinRegions(o.Regions), len(o.Accounts), len(o.Resources))
+					SanitizeCell(o.StatusCode), Countdown(o.StatusCode, o.StartTime, now), FormatTime(o.StartTime),
+					SanitizeCell(JoinRegions(o.Regions)), len(o.Accounts), len(o.Resources))
 			}
 			ot.Flush()
 		}
@@ -90,7 +92,7 @@ func GroupTable(w io.Writer, groups []model.EventGroup, now time.Time, topicMode
 			rt := tabwriter.NewWriter(w, 0, 2, 2, ' ', 0)
 			fmt.Fprintln(rt, "  ACCOUNT\tREGION\tRESOURCE\tSTATUS")
 			for _, r := range g.Resources {
-				fmt.Fprintf(rt, "  %s\t%s\t%s\t%s\n", AccountLabel(r), r.Region, r.Value, OrDash(r.Status))
+				fmt.Fprintf(rt, "  %s\t%s\t%s\t%s\n", SanitizeCell(AccountLabel(r)), SanitizeCell(r.Region), SanitizeCell(r.Value), SanitizeCell(OrDash(r.Status)))
 			}
 			rt.Flush()
 		}
@@ -115,8 +117,8 @@ func GroupMarkdown(w io.Writer, groups []model.EventGroup, now time.Time, topicM
 	fmt.Fprintln(w, "|---|---|---|---:|---|---|---:|---:|---|")
 	for _, g := range groups {
 		fmt.Fprintf(w, "| %s | %s | %s | %d | %s | %s | %d | %d | %s |\n",
-			g.Service, StatusSummary(g.StatusCounts), Countdown(g.NextStatus, g.NextStart, now),
-			g.OccurrenceCount, JoinRegions(g.Regions), g.Category, g.AccountCount, g.ResourceCount, GroupLabel(g, topicMode))
+			SanitizeCell(g.Service), StatusSummary(g.StatusCounts), Countdown(g.NextStatus, g.NextStart, now),
+			g.OccurrenceCount, SanitizeCell(JoinRegions(g.Regions)), SanitizeCell(g.Category), g.AccountCount, g.ResourceCount, SanitizeCell(GroupLabel(g, topicMode)))
 	}
 }
 
@@ -125,13 +127,30 @@ func groupCSV(w io.Writer, groups []model.EventGroup, now time.Time, topicMode b
 	if topicMode {
 		head = "Topic"
 	}
-	fmt.Fprintf(w, "Service,Status,Next,Occurrences,Regions,Category,Accounts,Resources,%s\n", head)
-	for _, g := range groups {
-		fmt.Fprintf(w, "%s,%s,%s,%d,%s,%s,%d,%d,%q\n",
-			g.Service, StatusSummary(g.StatusCounts), Countdown(g.NextStatus, g.NextStart, now),
-			g.OccurrenceCount, strings.Join(g.Regions, " "), g.Category, g.AccountCount, g.ResourceCount, GroupLabel(g, topicMode))
+	// encoding/csv + writeCSVRow を使い、フォーミュラ中和（csvSafe）と ANSI/制御文字除去
+	// （SanitizeCell）を render.CSV と同じ経路で適用する（手書き出力だと取りこぼすため）。
+	cw := csv.NewWriter(w)
+	defer cw.Flush()
+	if err := cw.Write([]string{"Service", "Status", "Next", "Occurrences", "Regions", "Category", "Accounts", "Resources", head}); err != nil {
+		return err
 	}
-	return nil
+	for _, g := range groups {
+		row := []string{
+			g.Service,
+			StatusSummary(g.StatusCounts),
+			Countdown(g.NextStatus, g.NextStart, now),
+			strconv.Itoa(g.OccurrenceCount),
+			strings.Join(g.Regions, " "),
+			g.Category,
+			strconv.Itoa(g.AccountCount),
+			strconv.Itoa(g.ResourceCount),
+			GroupLabel(g, topicMode),
+		}
+		if err := writeCSVRow(cw, row); err != nil {
+			return err
+		}
+	}
+	return cw.Error()
 }
 
 // StatusSummary は status 件数を深刻度順に "open:2 upcoming:5" のように整形する。

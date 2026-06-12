@@ -47,8 +47,9 @@ func (i occItem) events() []model.LogicalEvent { return []model.LogicalEvent{i.e
 
 func (i occItem) Title() string {
 	// status は色分け（幅は Render 前にパディングして整列を保つ）。
-	status := statusStyle(i.ev.StatusCode).Render(fmt.Sprintf("%-9s", i.ev.StatusCode))
-	t := fmt.Sprintf("%-8s  %s  %s", i.ev.Service, status, i.ev.EventTypeCode)
+	// 表示文字列は ANSI/制御文字を除去して一覧レイアウトの破壊と端末インジェクションを防ぐ。
+	status := statusStyle(i.ev.StatusCode).Render(fmt.Sprintf("%-9s", render.SanitizeCell(i.ev.StatusCode)))
+	t := fmt.Sprintf("%-8s  %s  %s", render.SanitizeCell(i.ev.Service), status, render.SanitizeCell(i.ev.EventTypeCode))
 	return t + eolSuffix(i.ev.EventTypeCode)
 }
 
@@ -57,8 +58,8 @@ func (i occItem) Description() string {
 	return fmt.Sprintf("in %s · start %s · %s · %s",
 		render.Countdown(i.ev.StatusCode, i.ev.StartTime, i.now),
 		render.FormatDate(i.ev.StartTime),
-		render.JoinRegions(i.ev.Regions),
-		render.OrDash(i.ev.Category),
+		render.SanitizeCell(render.JoinRegions(i.ev.Regions)),
+		render.SanitizeCell(render.OrDash(i.ev.Category)),
 	)
 }
 
@@ -84,7 +85,7 @@ func (i groupItem) statusCodes() []string {
 }
 
 func (i groupItem) Title() string {
-	return fmt.Sprintf("%-8s  %s", i.g.Service, render.GroupLabel(i.g, i.topic)) + eolSuffix(i.g.EventTypeCode)
+	return fmt.Sprintf("%-8s  %s", render.SanitizeCell(i.g.Service), render.SanitizeCell(render.GroupLabel(i.g, i.topic))) + eolSuffix(i.g.EventTypeCode)
 }
 
 func (i groupItem) Description() string {
@@ -92,8 +93,8 @@ func (i groupItem) Description() string {
 		render.StatusSummary(i.g.StatusCounts),
 		render.Countdown(i.g.NextStatus, i.g.NextStart, i.now),
 		i.g.OccurrenceCount,
-		render.JoinRegions(i.g.Regions),
-		render.OrDash(i.g.Category),
+		render.SanitizeCell(render.JoinRegions(i.g.Regions)),
+		render.SanitizeCell(render.OrDash(i.g.Category)),
 	)
 }
 

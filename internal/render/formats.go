@@ -51,10 +51,11 @@ func csvSafe(s string) string {
 	return s
 }
 
-// writeCSVRow は各セルを csvSafe で中和してから 1 行書き出す。
+// writeCSVRow は各セルを ANSI/制御文字除去（SanitizeCell）→ フォーミュラ中和（csvSafe）の
+// 順に通してから 1 行書き出す。cat 等で端末に流された場合の制御文字インジェクションも防ぐ。
 func writeCSVRow(cw *csv.Writer, row []string) error {
 	for i := range row {
-		row[i] = csvSafe(row[i])
+		row[i] = csvSafe(SanitizeCell(row[i]))
 	}
 	return cw.Write(row)
 }
@@ -97,8 +98,8 @@ func Markdown(w io.Writer, events []model.LogicalEvent, now time.Time, showDetai
 	fmt.Fprintln(w, "|---|---|---|---|---|---|---|---:|---:|")
 	for _, e := range events {
 		fmt.Fprintf(w, "| %s | %s | %s | %s | %s | %s | %s | %d | %d |\n",
-			e.Service, e.StatusCode, Countdown(e.StatusCode, e.StartTime, now), FormatTime(e.StartTime),
-			e.EventTypeCode, e.Category, JoinRegions(e.Regions), len(e.Accounts), len(e.Resources))
+			SanitizeCell(e.Service), SanitizeCell(e.StatusCode), Countdown(e.StatusCode, e.StartTime, now), FormatTime(e.StartTime),
+			SanitizeCell(e.EventTypeCode), SanitizeCell(e.Category), SanitizeCell(JoinRegions(e.Regions)), len(e.Accounts), len(e.Resources))
 	}
 	if !showDetails && !showResources {
 		return
@@ -108,9 +109,9 @@ func Markdown(w io.Writer, events []model.LogicalEvent, now time.Time, showDetai
 			continue
 		}
 		fmt.Fprintf(w, "\n#### %s [%s] %s — start %s (%s)\n\n",
-			e.EventTypeCode, e.Service, e.StatusCode, FormatTime(e.StartTime), Countdown(e.StatusCode, e.StartTime, now))
+			SanitizeCell(e.EventTypeCode), SanitizeCell(e.Service), SanitizeCell(e.StatusCode), FormatTime(e.StartTime), Countdown(e.StatusCode, e.StartTime, now))
 		if showDetails && e.Description != "" {
-			fmt.Fprintf(w, "%s\n", e.Description)
+			fmt.Fprintf(w, "%s\n", SanitizeText(e.Description))
 		}
 		if len(e.Resources) == 0 {
 			continue
@@ -118,7 +119,7 @@ func Markdown(w io.Writer, events []model.LogicalEvent, now time.Time, showDetai
 		fmt.Fprintf(w, "\n| ACCOUNT | REGION | RESOURCE | STATUS |\n")
 		fmt.Fprintln(w, "|---|---|---|---|")
 		for _, r := range e.Resources {
-			fmt.Fprintf(w, "| %s | %s | %s | %s |\n", AccountLabel(r), r.Region, r.Value, OrDash(r.Status))
+			fmt.Fprintf(w, "| %s | %s | %s | %s |\n", SanitizeCell(AccountLabel(r)), SanitizeCell(r.Region), SanitizeCell(r.Value), SanitizeCell(OrDash(r.Status)))
 		}
 	}
 }
