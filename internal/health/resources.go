@@ -16,6 +16,9 @@ import (
 // region はイベントが属するリージョンで、結果の各リソースに付与する。
 // org=true では「影響アカウント→影響エンティティ」の 2 段で全アカウント分を平坦化する。
 func (c *Client) FetchResources(ctx context.Context, org bool, eventArn, region string) ([]model.Resource, error) {
+	if c.fixture != nil {
+		return c.fixture.Resources[eventArn], nil
+	}
 	key := fmt.Sprintf("%s|resources|org=%v|%s", c.ns, org, eventArn)
 	return cache.Fetch(c.cache, key, c.ttl, func() ([]model.Resource, error) {
 		if org {

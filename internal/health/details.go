@@ -38,6 +38,9 @@ func (c *Client) detailKey(org bool, eventArn string) string {
 
 // FetchDetails は単一イベント（ARN）の説明文と eventMetadata を取得する（TUI の遅延ロード用）。
 func (c *Client) FetchDetails(ctx context.Context, org bool, eventArn string) (Detail, error) {
+	if c.fixture != nil {
+		return c.fixture.Details[eventArn], nil
+	}
 	return cache.Fetch(c.cache, c.detailKey(org, eventArn), c.ttl, func() (Detail, error) {
 		if org {
 			return c.fetchDetailOrg(ctx, eventArn)
@@ -51,6 +54,17 @@ func (c *Client) FetchDetails(ctx context.Context, org bool, eventArn string) (D
 // これにより per-event の大量並列呼び出しを避け、ThrottlingException(429) を抑える。
 func (c *Client) FetchDetailsBatch(ctx context.Context, org bool, reqs []DetailReq) (map[string]Detail, error) {
 	out := make(map[string]Detail)
+	if c.fixture != nil {
+		for _, r := range reqs {
+			if r.Arn == "" {
+				continue
+			}
+			if d, ok := c.fixture.Details[r.Arn]; ok {
+				out[r.Arn] = d
+			}
+		}
+		return out, nil
+	}
 	seen := make(map[string]bool)
 	var misses []DetailReq
 	for _, r := range reqs {

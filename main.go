@@ -115,30 +115,34 @@ func versionCmd() *cobra.Command {
 }
 
 type eventsOpts struct {
-	profile     string
-	scope       string
-	status      string
-	within      string
-	since       string
-	starting    string
-	openSince   string
-	service     string
-	region      string
-	category    string
-	eventType   string
-	noMerge     bool
-	groupBy     string
-	showOcc     bool
-	showDetails bool
-	showRes     bool
-	mode        string // 起動モード: auto | tui | cli
-	forceFormat bool   // -f/-o がコマンドラインで明示されたか（mode=auto/tui でも CLI 出力を優先）
-	tz          string
-	format      string
-	output      string
-	noCache     bool
-	refresh     bool
-	cacheTTL    string
+	profile      string
+	scope        string
+	status       string
+	within       string
+	since        string
+	starting     string
+	openSince    string
+	service      string
+	region       string
+	category     string
+	eventType    string
+	noMerge      bool
+	groupBy      string
+	showOcc      bool
+	showDetails  bool
+	showRes      bool
+	mode         string // 起動モード: auto | tui | cli
+	forceFormat  bool   // -f/-o がコマンドラインで明示されたか（mode=auto/tui でも CLI 出力を優先）
+	tz           string
+	format       string
+	output       string
+	noCache      bool
+	refresh      bool
+	cacheTTL     string
+	demo         string   // 非空ならデモモード: この fixture(JSON) から起動し AWS を呼ばない
+	dumpFixture  string   // 非空なら実データを取得して fixture(JSON) に書き出す
+	scrub        bool     // --dump-fixture 時に PII を匿名化して保存
+	scrubReplace []string // --scrub の追加置換（old=new、反復指定可）
 }
 
 func eventsCmd() *cobra.Command {
@@ -186,6 +190,11 @@ func eventsCmd() *cobra.Command {
 	f.Bool("no-cache", false, "キャッシュを使わない")
 	f.Bool("refresh", false, "キャッシュを無視して再取得（結果は保存）")
 	f.String("cache-ttl", "1h", "キャッシュ有効期間（例: 30m, 1h, 6h, 1d）")
+	// デモ／フェイクデータ（スクショ・動画用）
+	f.String("demo", "", "デモモード: 指定した fixture(JSON) から起動し AWS を一切呼ばない（SSO 不要）")
+	f.String("dump-fixture", "", "実データを取得して fixture(JSON) に書き出す（--demo 用のフェイクデータの元）")
+	f.Bool("scrub", false, "--dump-fixture 時: アカウントID/リソース値/アカウント名を匿名化して保存")
+	f.StringArray("scrub-replace", nil, "--scrub 時の追加置換 old=new（会社名など、反復指定可）")
 	return cmd
 }
 
@@ -243,30 +252,34 @@ func optsFromViper(cmd *cobra.Command) (*eventsOpts, error) {
 	forceFormat := cmd.Flags().Changed("format") || cmd.Flags().Changed("output")
 
 	return &eventsOpts{
-		profile:     v.GetString("profile"),
-		scope:       v.GetString("scope"),
-		status:      getStr("status"),
-		within:      v.GetString("within"),
-		since:       v.GetString("since"),
-		starting:    v.GetString("starting"),
-		openSince:   v.GetString("open-since"),
-		service:     getStr("service"),
-		region:      getStr("filter-region"),
-		category:    getStr("category"),
-		eventType:   v.GetString("event-type"),
-		groupBy:     v.GetString("group-by"),
-		showOcc:     v.GetBool("show-occurrences"),
-		noMerge:     v.GetBool("no-merge"),
-		showDetails: v.GetBool("show-details"),
-		showRes:     v.GetBool("show-resources"),
-		mode:        mode,
-		forceFormat: forceFormat,
-		tz:          v.GetString("tz"),
-		format:      v.GetString("format"),
-		output:      v.GetString("output"),
-		noCache:     v.GetBool("no-cache"),
-		refresh:     v.GetBool("refresh"),
-		cacheTTL:    v.GetString("cache-ttl"),
+		profile:      v.GetString("profile"),
+		scope:        v.GetString("scope"),
+		status:       getStr("status"),
+		within:       v.GetString("within"),
+		since:        v.GetString("since"),
+		starting:     v.GetString("starting"),
+		openSince:    v.GetString("open-since"),
+		service:      getStr("service"),
+		region:       getStr("filter-region"),
+		category:     getStr("category"),
+		eventType:    v.GetString("event-type"),
+		groupBy:      v.GetString("group-by"),
+		showOcc:      v.GetBool("show-occurrences"),
+		noMerge:      v.GetBool("no-merge"),
+		showDetails:  v.GetBool("show-details"),
+		showRes:      v.GetBool("show-resources"),
+		mode:         mode,
+		forceFormat:  forceFormat,
+		tz:           v.GetString("tz"),
+		format:       v.GetString("format"),
+		output:       v.GetString("output"),
+		noCache:      v.GetBool("no-cache"),
+		refresh:      v.GetBool("refresh"),
+		cacheTTL:     v.GetString("cache-ttl"),
+		demo:         v.GetString("demo"),
+		dumpFixture:  v.GetString("dump-fixture"),
+		scrub:        v.GetBool("scrub"),
+		scrubReplace: v.GetStringSlice("scrub-replace"),
 	}, nil
 }
 
@@ -319,13 +332,14 @@ func parseStartingRange(s string, now time.Time) (time.Time, time.Time, error) {
 // 後続の遅延取得（詳細/リソース/アカウント名）に必要なクライアント・キャッシュを束ねる。
 // CLI（runEvents の後半）と TUI（tui.Run）の双方が同じ取得経路を共有するための受け渡し型。
 type fetchResult struct {
-	client  *health.Client
-	org     bool
-	logical []model.LogicalEvent // フィルタ・マージ・ソート済み（enrich 前）
-	now     time.Time
-	cache   *cache.Cache
-	ns      string
-	cfg     aws.Config // org アカウント名解決（orgs.NameMap）用
+	client       *health.Client
+	org          bool
+	logical      []model.LogicalEvent // フィルタ・マージ・ソート済み（enrich 前）
+	now          time.Time
+	cache        *cache.Cache
+	ns           string
+	cfg          aws.Config        // org アカウント名解決（orgs.NameMap）用
+	accountNames map[string]string // デモ時のみ非 nil: fixture 由来の ID→名前（orgs を介さず付与）
 }
 
 // loadLogical は取得パイプラインの前半（fetch→filter→prune→horizon→merge→sort）を実行する。
@@ -376,11 +390,6 @@ func loadLogical(ctx context.Context, o *eventsOpts, quiet bool) (*fetchResult, 
 		EventType: eventTypeRe,
 	}
 
-	cfg, err := awsx.LoadConfig(ctx, o.profile)
-	if err != nil {
-		return nil, fmt.Errorf("load aws config: %w", err)
-	}
-
 	ca, err := cache.New(!o.noCache, o.refresh)
 	if err != nil {
 		return nil, fmt.Errorf("init cache: %w", err)
@@ -397,11 +406,41 @@ func loadLogical(ctx context.Context, o *eventsOpts, quiet bool) (*fetchResult, 
 		}
 	}
 
-	logf("=== AWS Health Dashboard ===\nProfile: %s  Scope: %s  Status: %s%s  TZ: %s\n\n",
-		orDefault(o.profile), o.scope, strings.Join(statuses, ","), modeSuffix(o), render.ZoneName())
+	// クライアント生成。デモモードは AWS config をロードせず fixture から応答する。
+	var (
+		cfg          aws.Config
+		client       *health.Client
+		accountNames map[string]string
+	)
+	if o.demo != "" {
+		fx, ferr := health.LoadFixture(o.demo)
+		if ferr != nil {
+			return nil, fmt.Errorf("load demo fixture: %w", ferr)
+		}
+		health.RebaseFixture(fx, now)
+		// デモ専用の名前空間に隔離する。実行プロファイルと同じ ns を使うと、
+		// 先回りシードした fixture のアカウント名が後続の実 run（同一 profile・AccountsTTL=24h）に
+		// 漏れてしまうため、"demo:" を前置して実キャッシュと衝突させない。
+		ns = "demo:" + ns
+		client = health.NewFixture(ns, fx)
+		accountNames = fx.Accounts
+		// org の名前解決（runEvents / TUI とも ns+"|accounts" キャッシュを引く）を先回りシード。
+		if org {
+			cache.Put(ca, ns+"|accounts", fx.Accounts)
+		}
+		logf("=== AWS Health Dashboard (DEMO) ===\nFixture: %s  Scope: %s  Status: %s%s  TZ: %s\n\n",
+			o.demo, o.scope, strings.Join(statuses, ","), modeSuffix(o), render.ZoneName())
+	} else {
+		cfg, err = awsx.LoadConfig(ctx, o.profile)
+		if err != nil {
+			return nil, fmt.Errorf("load aws config: %w", err)
+		}
+		client = health.New(cfg, ca, ns, ttl)
+		logf("=== AWS Health Dashboard ===\nProfile: %s  Scope: %s  Status: %s%s  TZ: %s\n\n",
+			orDefault(o.profile), o.scope, strings.Join(statuses, ","), modeSuffix(o), render.ZoneName())
+	}
 	logf("Fetching events...\n")
 
-	client := health.New(cfg, ca, ns, ttl)
 	events, err := client.FetchEvents(ctx, org, q)
 	if err != nil {
 		return nil, fmt.Errorf("fetch events: %w", err)
@@ -443,13 +482,14 @@ func loadLogical(ctx context.Context, o *eventsOpts, quiet bool) (*fetchResult, 
 	query.SortLogical(logical)
 
 	return &fetchResult{
-		client:  client,
-		org:     org,
-		logical: logical,
-		now:     now,
-		cache:   ca,
-		ns:      ns,
-		cfg:     cfg,
+		client:       client,
+		org:          org,
+		logical:      logical,
+		now:          now,
+		cache:        ca,
+		ns:           ns,
+		cfg:          cfg,
+		accountNames: accountNames,
 	}, nil
 }
 
@@ -482,6 +522,9 @@ func runEvents(ctx context.Context, o *eventsOpts) error {
 	default:
 		return fmt.Errorf("invalid --mode %q (auto|tui|cli)", o.mode)
 	}
+	if o.demo != "" && o.dumpFixture != "" {
+		return fmt.Errorf("--demo と --dump-fixture は同時指定できません（取得元が矛盾）")
+	}
 
 	loc, lerr := parseLocation(o.tz)
 	if lerr != nil {
@@ -495,9 +538,14 @@ func runEvents(ctx context.Context, o *eventsOpts) error {
 		fmt.Fprintln(os.Stderr, "warning: 標準出力が端末ではないため TUI を起動せず CLI 出力にフォールバックします")
 	}
 
-	res, err := loadLogical(ctx, o, launchTUI)
+	res, err := loadLogical(ctx, o, launchTUI || o.dumpFixture != "")
 	if err != nil {
 		return err
+	}
+
+	// 実データを fixture に書き出して終了（録画用フェイクデータの元）。
+	if o.dumpFixture != "" {
+		return dumpFixture(ctx, o, res)
 	}
 
 	// 対話的 TUI: 一覧→Enter で詳細/影響リソースにドリルダウン。
@@ -540,13 +588,18 @@ func runEvents(ctx context.Context, o *eventsOpts) error {
 			return fmt.Errorf("fetch affected resources: %w", err)
 		}
 		if org {
-			names, nerr := cache.Fetch(ca, ns+"|accounts", cache.AccountsTTL, func() (map[string]string, error) {
-				return orgs.New(cfg).NameMap(ctx)
-			})
-			if nerr != nil {
-				fmt.Fprintf(os.Stderr, "warning: アカウント名解決をスキップ: %v\n", nerr)
+			if res.accountNames != nil {
+				// デモ: fixture 由来の名前を直接付与（orgs/AWS を介さず、--no-cache でも機能）。
+				enrich.ApplyAccountNames(logical, res.accountNames)
 			} else {
-				enrich.ApplyAccountNames(logical, names)
+				names, nerr := cache.Fetch(ca, ns+"|accounts", cache.AccountsTTL, func() (map[string]string, error) {
+					return orgs.New(cfg).NameMap(ctx)
+				})
+				if nerr != nil {
+					fmt.Fprintf(os.Stderr, "warning: アカウント名解決をスキップ: %v\n", nerr)
+				} else {
+					enrich.ApplyAccountNames(logical, names)
+				}
 			}
 		}
 	}
@@ -586,6 +639,93 @@ func runEvents(ctx context.Context, o *eventsOpts) error {
 		fmt.Fprintf(os.Stderr, "Output saved to: %s\n", o.output)
 	}
 	return nil
+}
+
+// dumpFixture は実データ取得結果から fixture を組み立て、（--scrub 時は匿名化して）保存する。
+func dumpFixture(ctx context.Context, o *eventsOpts, res *fetchResult) error {
+	// 表示対象の生イベントを論理イベントから集める（重複排除）。
+	var raws []model.Event
+	seen := make(map[string]bool)
+	for _, le := range res.logical {
+		for _, e := range le.RawEvents {
+			if e.Arn == "" || seen[e.Arn] {
+				continue
+			}
+			seen[e.Arn] = true
+			raws = append(raws, e)
+		}
+	}
+
+	// org のアカウント名（ベストエフォート）。
+	names := map[string]string{}
+	if res.org {
+		fmt.Fprintln(os.Stderr, "Resolving account names...")
+		if m, err := cache.Fetch(res.cache, res.ns+"|accounts", cache.AccountsTTL, func() (map[string]string, error) {
+			return orgs.New(res.cfg).NameMap(ctx)
+		}); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: アカウント名解決をスキップ: %v\n", err)
+		} else {
+			names = m
+		}
+	}
+
+	fmt.Fprintf(os.Stderr, "Building fixture from %d event(s)...\n", len(raws))
+	fx, err := health.BuildFixture(ctx, res.client, res.org, raws, names)
+	if err != nil {
+		return fmt.Errorf("build fixture: %w", err)
+	}
+
+	// 影響アカウントに現れる ID の名前だけ残してフットプリントを絞る。
+	used := make(map[string]bool)
+	for _, ids := range fx.Affected {
+		for _, id := range ids {
+			used[id] = true
+		}
+	}
+	for _, rs := range fx.Resources {
+		for _, r := range rs {
+			if r.AccountID != "" {
+				used[r.AccountID] = true
+			}
+		}
+	}
+	pruned := make(map[string]string)
+	for id := range used {
+		if n, ok := names[id]; ok {
+			pruned[id] = n
+		}
+	}
+	fx.Accounts = pruned
+
+	if o.scrub {
+		repl, perr := parseReplace(o.scrubReplace)
+		if perr != nil {
+			return perr
+		}
+		fx.Scrub(repl)
+		fmt.Fprintln(os.Stderr, "Scrubbed PII (account IDs / resource values / account names).")
+	}
+	if err := fx.Save(o.dumpFixture); err != nil {
+		return fmt.Errorf("save fixture: %w", err)
+	}
+	fmt.Fprintf(os.Stderr, "Fixture saved to: %s\n", o.dumpFixture)
+	if !o.scrub {
+		fmt.Fprintln(os.Stderr, "warning: --scrub なしのため PII を含む可能性があります。共有/コミット前に確認してください。")
+	}
+	return nil
+}
+
+// parseReplace は --scrub-replace の "old=new" 列をマップに変換する。
+func parseReplace(pairs []string) (map[string]string, error) {
+	out := make(map[string]string)
+	for _, p := range pairs {
+		i := strings.Index(p, "=")
+		if i <= 0 {
+			return nil, fmt.Errorf("invalid --scrub-replace %q (use old=new)", p)
+		}
+		out[p[:i]] = p[i+1:]
+	}
+	return out, nil
 }
 
 func orDefault(s string) string {

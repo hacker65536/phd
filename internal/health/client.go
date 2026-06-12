@@ -29,6 +29,7 @@ type Client struct {
 	ns      string        // キャッシュキーの名前空間（profile|region など）
 	ttl     time.Duration // events / resources / details の TTL
 	limiter *rate.Limiter // 送信レート制御（429 対策）
+	fixture *Fixture      // 非 nil ならデモモード: 取得は fixture から応答し AWS を呼ばない
 }
 
 // New は設定から Client を生成する。ca が nil ならキャッシュ無効。
@@ -52,6 +53,12 @@ func (c *Client) wait(ctx context.Context) {
 // fetchAffectedAccountsOrg は org イベントの影響アカウント ID 一覧を返す（キャッシュ共有）。
 // 詳細取得（account-specific の account 解決）と影響リソース取得の両方から使い、重複呼び出しを避ける。
 func (c *Client) fetchAffectedAccountsOrg(ctx context.Context, eventArn string) ([]string, error) {
+	if c.fixture != nil {
+		if ids, ok := c.fixture.Affected[eventArn]; ok {
+			return ids, nil
+		}
+		return accountsFromResources(c.fixture.Resources[eventArn]), nil
+	}
 	key := fmt.Sprintf("%s|affaccts|%s", c.ns, eventArn)
 	return cache.Fetch(c.cache, key, c.ttl, func() ([]string, error) {
 		var ids []string
@@ -109,6 +116,9 @@ func dtr(from, to time.Time) (htypes.DateTimeRange, bool) {
 
 // FetchEvents は条件に合うイベントを取得して正規化する。
 func (c *Client) FetchEvents(ctx context.Context, org bool, q Query) ([]model.Event, error) {
+	if c.fixture != nil {
+		return c.fixture.Events, nil
+	}
 	key := fmt.Sprintf("%s|events|org=%v|%s", c.ns, org, q.key())
 	return cache.Fetch(c.cache, key, c.ttl, func() ([]model.Event, error) {
 		if org {
