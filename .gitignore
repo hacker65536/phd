@@ -36,6 +36,9 @@ config.local.yaml
 phd-resources-*.csv
 phd-events-*.csv
 
+# === デモ（ローカル生成物・追跡対象外） ===
+/demo/
+
 # === Claude Code（個人ローカル設定のみ除外） ===
 # commands/ など共有資産は追跡する。
 .claude/settings.local.json
