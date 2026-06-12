@@ -31,6 +31,12 @@ vet: ## go vet
 .PHONY: check
 check: fmt vet test ## fmt + vet + test（push 前の一括チェック）
 
+.PHONY: demo
+demo: build ## docs/demo の GIF を VHS で再生成（要 vhs / フェイクデータ docs/demo/fixture.json を使用）
+	vhs docs/demo/cli.tape
+	vhs docs/demo/tui.tape
+	vhs docs/demo/tui-filter.tape
+
 .PHONY: snapshot
 snapshot: ## goreleaser でローカルにリリース成果物を生成（タグ不要・公開しない）
 	goreleaser release --snapshot --clean

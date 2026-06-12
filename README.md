@@ -215,6 +215,30 @@ phd events --mode tui
 
 確定時、入力した `key:value` のうち上記 4 軸はチップへ昇格し、残りは自由語として入力欄に残る（例: `svc:EC2 retirement` → チップ `svc:EC2` ＋ 入力欄 `retirement`）。`Esc` は入力中なら取消（確定状態へ戻す）、確定後ならチップ・自由語を一括解除（さらに `Esc` で 1 階層戻る）。フィルタはドリルダウンして戻っても**維持される**（各階層ごとに保持・復元）。
 
+## デモ（スクショ・動画）
+
+実データ（アカウント ID・ARN・影響リソース・会社名）を共有せずに使い方を見せるための **デモモード**を備える。
+`--demo <fixture.json>` を渡すと **AWS を一切呼ばず**（SSO 不要・オフライン）、同梱のフェイクデータだけで CLI も TUI も動く。
+
+```bash
+./phd --demo docs/demo/fixture.json                       # 端末なら TUI
+./phd --demo docs/demo/fixture.json --mode cli --group-by type --show-resources
+```
+
+**CLI**（region マージ → `--group-by type` → `--show-resources`）:
+
+![CLI demo](docs/demo/cli.gif)
+
+**TUI ① ドリルダウン**（一覧 → 詳細 → 影響リソース → `a` で resolved の表示/非表示）:
+
+![TUI drilldown demo](docs/demo/tui.gif)
+
+**TUI ② 絞り込み**（`s` status / `c` category のチェックボックス、`/` で `svc:RDS` チップ化、フリーワード）:
+
+![TUI filter demo](docs/demo/tui-filter.gif)
+
+> 自分の実データを匿名化して fixture を作る方法・GIF の再生成・tape の編集は **[docs/demo/README.md](docs/demo/README.md)** を参照。
+
 ## 設定ファイル（config.yaml）
 
 全フラグは YAML / 環境変数でも指定できる（Viper）。毎回同じプロファイルや絞り込みを打たずに済む。
