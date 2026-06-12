@@ -37,9 +37,13 @@ func New(enabled, refresh bool) (*Cache, error) {
 		base = os.TempDir()
 	}
 	c.dir = filepath.Join(base, "phd")
-	if err := os.MkdirAll(c.dir, 0o755); err != nil {
+	// 0o700: キャッシュには組織のアカウント ID・名前・影響リソース ARN など社内情報が入るため、
+	// 共有ホストで他ユーザから読まれないよう所有者のみに制限する。
+	if err := os.MkdirAll(c.dir, 0o700); err != nil {
 		return nil, err
 	}
+	// 旧バージョンが 0o755 で作成済みのディレクトリも締め直す（ベストエフォート）。
+	_ = os.Chmod(c.dir, 0o700)
 	return c, nil
 }
 
@@ -75,7 +79,7 @@ func Fetch[T any](c *Cache, key string, ttl time.Duration, fn func() (T, error))
 	}
 	if data, merr := json.Marshal(v); merr == nil {
 		tmp := path + ".tmp"
-		if os.WriteFile(tmp, data, 0o644) == nil {
+		if os.WriteFile(tmp, data, 0o600) == nil { // 社内情報を含むため所有者のみ
 			_ = os.Rename(tmp, path)
 		}
 	}
@@ -110,7 +114,7 @@ func Put[T any](c *Cache, key string, v T) {
 	if data, err := json.Marshal(v); err == nil {
 		path := c.path(key)
 		tmp := path + ".tmp"
-		if os.WriteFile(tmp, data, 0o644) == nil {
+		if os.WriteFile(tmp, data, 0o600) == nil { // 社内情報を含むため所有者のみ
 			_ = os.Rename(tmp, path)
 		}
 	}
