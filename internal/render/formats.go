@@ -36,6 +36,29 @@ func JSON(w io.Writer, events []model.LogicalEvent) error {
 	return enc.Encode(events)
 }
 
+// csvSafe は CSV フォーミュラ・インジェクション対策。表計算ソフト（Excel / Google Sheets /
+// LibreOffice）は先頭が =,+,-,@（およびタブ/CR）のセルを数式として評価しうるため、該当セルの
+// 先頭にシングルクォートを付けて無害化する。AWS Health 由来でもアカウント名・リソース値・
+// 説明はユーザーが任意に決められるため、出力前に必ず通す。
+func csvSafe(s string) string {
+	if s == "" {
+		return s
+	}
+	switch s[0] {
+	case '=', '+', '-', '@', '\t', '\r':
+		return "'" + s
+	}
+	return s
+}
+
+// writeCSVRow は各セルを csvSafe で中和してから 1 行書き出す。
+func writeCSVRow(cw *csv.Writer, row []string) error {
+	for i := range row {
+		row[i] = csvSafe(row[i])
+	}
+	return cw.Write(row)
+}
+
 // CSV はリソース単位の行で出力する（リソースが無いイベントは1行、リソース列は空）。
 func CSV(w io.Writer, events []model.LogicalEvent) error {
 	cw := csv.NewWriter(w)
@@ -44,7 +67,7 @@ func CSV(w io.Writer, events []model.LogicalEvent) error {
 		"EventTypeCode", "Service", "Status", "Category", "Regions", "Start", "End",
 		"AccountName", "AccountID", "ResourceRegion", "Resource", "ResourceStatus",
 	}
-	if err := cw.Write(header); err != nil {
+	if err := cw.Write(header); err != nil { // ヘッダは固定値のため中和不要
 		return err
 	}
 	for _, e := range events {
@@ -53,14 +76,14 @@ func CSV(w io.Writer, events []model.LogicalEvent) error {
 			strings.Join(e.Regions, " "), FormatTime(e.StartTime), FormatTime(e.EndTime),
 		}
 		if len(e.Resources) == 0 {
-			if err := cw.Write(append(base, "", "", "", "", "")); err != nil {
+			if err := writeCSVRow(cw, append(base, "", "", "", "", "")); err != nil {
 				return err
 			}
 			continue
 		}
 		for _, r := range e.Resources {
 			row := append(append([]string{}, base...), r.AccountName, r.AccountID, r.Region, r.Value, r.Status)
-			if err := cw.Write(row); err != nil {
+			if err := writeCSVRow(cw, row); err != nil {
 				return err
 			}
 		}
