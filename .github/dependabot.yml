@@ -1,0 +1,32 @@
+# Dependabot 設定。
+# GitHub Actions と Go モジュールの更新を自動 PR 化する。
+# workflow の action は major タグ参照（@v6 等）のままにしつつ、bump を検知して PR を上げることで
+# サプライチェーン更新の見落としを防ぐ（手動 SHA ピン留めの運用負荷を避ける折衷案）。
+version: 2
+updates:
+  # CI / Release workflow で使う action（actions/checkout, setup-go, goreleaser-action 等）
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      # 細かい PR を増やさないよう 1 つにまとめる
+      actions:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "ci"
+
+  # Go モジュール（AWS SDK / Bubble Tea / cobra / viper 等）
+  - package-ecosystem: gomod
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      # minor / patch はまとめて 1 PR に（major は破壊的変更があり得るので個別 PR のまま残す）
+      go-minor-patch:
+        update-types:
+          - minor
+          - patch
+    commit-message:
+      prefix: "chore"
