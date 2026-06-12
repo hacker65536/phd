@@ -7,6 +7,7 @@ import (
 	"os"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -135,16 +136,25 @@ func BuildFixture(ctx context.Context, c *Client, org bool, events []model.Event
 	return fx, nil
 }
 
-var twelveDigit = regexp.MustCompile(`\d{12}`)
+var (
+	twelveDigit = regexp.MustCompile(`\d{12}`)
+	// 自由文（説明・metadata・ARN）に紛れる PII のうち、機械的に確実に検出できるもの。
+	// 人名・社名・ホスト名などは誤検知が多いため対象外（--scrub-replace と目視確認で対応）。
+	emailRe = regexp.MustCompile(`[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}`)
+	ipv4Re  = regexp.MustCompile(`\b(?:\d{1,3}\.){3}\d{1,3}\b`)
+)
 
-// Scrub は PII（アカウント ID・リソース値・アカウント名・任意トークン）を決定論的に匿名化する。
-// eventTypeCode / service / region / 時系列は保持する（リアルさを残すため）。
+// Scrub は PII（アカウント ID・リソース値・アカウント名・メール・IPv4・任意トークン）を
+// 決定論的に匿名化する。eventTypeCode / service / region / 時系列は保持する（リアルさを残すため）。
 // repl は追加の固定置換（会社名 → プレースホルダ等、old→new）。
+// 注意: 人名・ホスト名・バケット名など自由文中の非構造 PII は対象外。共有/コミット前に目視確認すること。
 func (f *Fixture) Scrub(repl map[string]string) {
 	idMap := map[string]string{}
 	valMap := map[string]string{}
 	nameMap := map[string]string{}
-	var idN, valN, nameN int
+	emailMap := map[string]string{}
+	ipMap := map[string]string{}
+	var idN, valN, nameN, emailN, ipN int
 
 	addID := func(s string) {
 		if s == "" {
@@ -178,14 +188,38 @@ func (f *Fixture) Scrub(repl map[string]string) {
 			nameMap[s] = fmt.Sprintf("Demo Account %02d", nameN)
 		}
 	}
+	scanEmails := func(s string) {
+		for _, m := range emailRe.FindAllString(s, -1) {
+			if _, ok := emailMap[m]; !ok {
+				emailN++
+				emailMap[m] = fmt.Sprintf("demo%d@example.com", emailN)
+			}
+		}
+	}
+	scanIPs := func(s string) {
+		for _, m := range ipv4Re.FindAllString(s, -1) {
+			if !validIPv4(m) {
+				continue // バージョン番号等の誤検知を除外
+			}
+			if _, ok := ipMap[m]; !ok {
+				ipN++
+				ipMap[m] = docIP(ipN)
+			}
+		}
+	}
+	scanFree := func(s string) { // 自由文に共通で適用する PII 走査
+		scanIDs(s)
+		scanEmails(s)
+		scanIPs(s)
+	}
 
 	// 決定論的な走査順でマッピングを採番する。
 	for _, e := range f.Events {
-		scanIDs(e.Arn)
+		scanFree(e.Arn)
 		if d, ok := f.Details[e.Arn]; ok {
-			scanIDs(d.Description)
+			scanFree(d.Description)
 			for _, k := range sortedKeys(d.Metadata) {
-				scanIDs(d.Metadata[k])
+				scanFree(d.Metadata[k])
 			}
 		}
 		for _, r := range f.Resources[e.Arn] {
@@ -204,7 +238,7 @@ func (f *Fixture) Scrub(repl map[string]string) {
 	}
 
 	// 自由文（ARN・説明・metadata 値）への部分置換用。長いキー優先で衝突を避ける。
-	rw := buildReplacer(repl, valMap, nameMap, idMap)
+	rw := buildReplacer(repl, valMap, nameMap, idMap, emailMap, ipMap)
 	mapOr := func(m map[string]string, s string) string {
 		if v, ok := m[s]; ok {
 			return v
@@ -254,6 +288,31 @@ func (f *Fixture) Scrub(repl map[string]string) {
 	f.Resources = newResources
 	f.Affected = newAffected
 	f.Accounts = newAccounts
+}
+
+// docIP は IP を RFC 5737 のドキュメント用レンジ（192.0.2/24・198.51.100/24・203.0.113/24）の
+// プレースホルダへ決定論的に割り当てる（リアルさを保ちつつ実 IP を残さない）。
+func docIP(n int) string {
+	blocks := []string{"192.0.2", "198.51.100", "203.0.113"}
+	host := (n-1)%254 + 1
+	block := blocks[((n-1)/254)%len(blocks)]
+	return fmt.Sprintf("%s.%d", block, host)
+}
+
+// validIPv4 は s の 4 オクテットがすべて 0..255 かを確認する（"1.2.3.4" 風のバージョン番号など
+// 範囲外の誤検知を IP マスク対象から除外するため）。
+func validIPv4(s string) bool {
+	parts := strings.Split(s, ".")
+	if len(parts) != 4 {
+		return false
+	}
+	for _, p := range parts {
+		n, err := strconv.Atoi(p)
+		if err != nil || n < 0 || n > 255 {
+			return false
+		}
+	}
+	return true
 }
 
 // scrubValue はリソース識別子をプレフィックス保持で連番化する。

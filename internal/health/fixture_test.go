@@ -134,3 +134,53 @@ func TestScrub(t *testing.T) {
 		t.Errorf("Accounts not re-keyed to scrubbed id %s", r.AccountID)
 	}
 }
+
+// Scrub: 自由文中のメール・IPv4 が決定論的にマスクされ、バージョン番号は誤検知しない。
+func TestScrubMasksEmailAndIP(t *testing.T) {
+	const arn = "arn:aws:health:us-east-1::event/RDS/AWS_RDS_MAINTENANCE/abc"
+	fx := sampleFixture()
+	fx.Details[arn] = Detail{
+		Description: "Contact ops@acme.com or sre@acme.com about host 10.20.30.40. Upgrade to 1.2.3.4 client; ping 10.20.30.40 again.",
+		Metadata:    map[string]string{"note": "escalate to ops@acme.com"},
+	}
+	fx.Scrub(nil)
+
+	desc := fx.Details[arn].Description
+	note := fx.Details[arn].Metadata["note"]
+
+	if strings.Contains(desc, "acme.com") || strings.Contains(note, "acme.com") {
+		t.Errorf("email not masked: desc=%q note=%q", desc, note)
+	}
+	if strings.Contains(desc, "10.20.30.40") {
+		t.Errorf("IP not masked: %q", desc)
+	}
+	// 同じメールは同じプレースホルダに（説明と metadata で一貫）。
+	if !strings.Contains(desc, "demo1@example.com") || !strings.Contains(note, "demo1@example.com") {
+		t.Errorf("email mapping not deterministic/consistent: desc=%q note=%q", desc, note)
+	}
+	// IP はドキュメント用レンジへ。
+	if !strings.Contains(desc, "192.0.2.1") {
+		t.Errorf("IP not mapped to doc range: %q", desc)
+	}
+	// "1.2.3.4" はバージョン番号ではなく有効 IP なのでマスクされる（範囲内）。
+	if strings.Contains(desc, "1.2.3.4") {
+		t.Errorf("valid in-range dotted quad should be masked: %q", desc)
+	}
+}
+
+// validIPv4: オクテット範囲外（バージョン番号等）は IP とみなさない。
+func TestValidIPv4(t *testing.T) {
+	cases := map[string]bool{
+		"10.20.30.40":     true,
+		"255.255.255.255": true,
+		"1.2.3.4":         true,
+		"256.1.1.1":       false, // オクテット > 255
+		"1.2.3":           false, // 3 要素
+		"1.2.3.4.5":       false, // 5 要素
+	}
+	for in, want := range cases {
+		if got := validIPv4(in); got != want {
+			t.Errorf("validIPv4(%q) = %v, want %v", in, got, want)
+		}
+	}
+}
