@@ -13,6 +13,7 @@ import (
 	_ "time/tzdata" // IANA タイムゾーンDBを埋め込み（--tz Asia/Tokyo 等を OS 非依存で解決）
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -51,16 +52,46 @@ func resolveVersion() string {
 }
 
 func main() {
-	if err := rootCmd().Execute(); err != nil {
+	root := rootCmd()
+	// events を既定サブコマンドにする: `phd …` を `phd events …` として扱う。
+	// 第1引数が既知のサブコマンドでも help/version フラグでもないときだけ events を補う。
+	if args := os.Args[1:]; needsEventsPrefix(root, args) {
+		root.SetArgs(append([]string{"events"}, args...))
+	}
+	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
 	}
 }
 
+// needsEventsPrefix は引数列を見て、既定サブコマンド events を先頭に補うべきか判定する。
+// 既知のサブコマンド名・エイリアス、help/version フラグ、cobra の補完用隠しコマンドは対象外。
+func needsEventsPrefix(root *cobra.Command, args []string) bool {
+	if len(args) == 0 {
+		return true // `phd` 単体 → events
+	}
+	switch args[0] {
+	case "-h", "--help", "-v", "--version",
+		"help", "completion", "__complete", "__completeNoDesc":
+		return false
+	}
+	for _, c := range root.Commands() {
+		if c.Name() == args[0] {
+			return false
+		}
+		for _, a := range c.Aliases {
+			if a == args[0] {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 func rootCmd() *cobra.Command {
 	root := &cobra.Command{
 		Use:           "phd",
-		Short:         "AWS Health Dashboard をローカルで確認する CLI",
+		Short:         "AWS Health Dashboard をローカルで確認する CLI（既定サブコマンド: events）",
 		Version:       resolveVersion(),
 		SilenceUsage:  true,
 		SilenceErrors: true,
@@ -100,7 +131,8 @@ type eventsOpts struct {
 	showOcc     bool
 	showDetails bool
 	showRes     bool
-	tui         bool
+	mode        string // 起動モード: auto | tui | cli
+	forceFormat bool   // -f/-o がコマンドラインで明示されたか（mode=auto/tui でも CLI 出力を優先）
 	tz          string
 	format      string
 	output      string
@@ -146,7 +178,8 @@ func eventsCmd() *cobra.Command {
 	f.Bool("no-merge", false, "region マージせず生イベントを表示")
 	f.Bool("show-details", false, "変更内容の説明(latestDescription)を展開")
 	f.Bool("show-resources", false, "影響リソースを全アカウント・全リージョン分、平坦テーブルで展開")
-	f.Bool("tui", false, "対話的 TUI を起動（一覧→Enter で詳細/影響リソースにドリルダウン）。--format/--output は無視")
+	f.String("mode", "auto", "起動モード: auto(端末なら TUI・パイプ/リダイレクトなら CLI) | tui | cli。config.yaml で既定を変更可")
+	f.Bool("tui", false, "[非推奨] --mode tui のエイリアス。対話的 TUI を起動")
 	f.String("tz", "", "時刻表示のタイムゾーン（既定 UTC）。例: local, Asia/Tokyo, UTC")
 	f.StringP("format", "f", "table", "出力形式: table|json|csv|markdown")
 	f.StringP("output", "o", "", "出力先ファイル（既定: 標準出力）")
@@ -201,6 +234,14 @@ func optsFromViper(cmd *cobra.Command) (*eventsOpts, error) {
 		return ""
 	}
 
+	// mode の解決。--tui（非推奨）が明示されたら mode=tui に倒す。
+	// -f/-o がコマンドラインで明示された場合は forceFormat=true（mode=auto/tui でも CLI 出力を優先）。
+	mode := v.GetString("mode")
+	if cmd.Flags().Changed("tui") && v.GetBool("tui") {
+		mode = "tui"
+	}
+	forceFormat := cmd.Flags().Changed("format") || cmd.Flags().Changed("output")
+
 	return &eventsOpts{
 		profile:     v.GetString("profile"),
 		scope:       v.GetString("scope"),
@@ -218,7 +259,8 @@ func optsFromViper(cmd *cobra.Command) (*eventsOpts, error) {
 		noMerge:     v.GetBool("no-merge"),
 		showDetails: v.GetBool("show-details"),
 		showRes:     v.GetBool("show-resources"),
-		tui:         v.GetBool("tui"),
+		mode:        mode,
+		forceFormat: forceFormat,
 		tz:          v.GetString("tz"),
 		format:      v.GetString("format"),
 		output:      v.GetString("output"),
@@ -423,20 +465,43 @@ func parseLocation(tz string) (*time.Location, error) {
 	}
 }
 
+// wantTUI は mode 設定と実行環境から TUI を起動するか決める。
+//   - stdout が端末でない（パイプ/リダイレクト/cron）なら常に CLI（スクリプト保護）。
+//   - -f/-o がコマンドラインで明示されたら CLI（その場だけ整形出力したい意図）。
+//   - それ以外は mode に従う（cli=CLI、tui/auto=TUI）。
+func wantTUI(mode string, forceFormat, stdoutTTY bool) bool {
+	if !stdoutTTY || forceFormat {
+		return false
+	}
+	return mode != "cli"
+}
+
 func runEvents(ctx context.Context, o *eventsOpts) error {
+	switch o.mode {
+	case "auto", "tui", "cli":
+	default:
+		return fmt.Errorf("invalid --mode %q (auto|tui|cli)", o.mode)
+	}
+
 	loc, lerr := parseLocation(o.tz)
 	if lerr != nil {
 		return fmt.Errorf("--tz %q: %w", o.tz, lerr)
 	}
 	render.SetDisplayLocation(loc)
 
-	res, err := loadLogical(ctx, o, o.tui)
+	stdoutTTY := isatty.IsTerminal(os.Stdout.Fd())
+	launchTUI := wantTUI(o.mode, o.forceFormat, stdoutTTY)
+	if o.mode == "tui" && !o.forceFormat && !stdoutTTY {
+		fmt.Fprintln(os.Stderr, "warning: 標準出力が端末ではないため TUI を起動せず CLI 出力にフォールバックします")
+	}
+
+	res, err := loadLogical(ctx, o, launchTUI)
 	if err != nil {
 		return err
 	}
 
 	// 対話的 TUI: 一覧→Enter で詳細/影響リソースにドリルダウン。
-	if o.tui {
+	if launchTUI {
 		return tui.Run(ctx, &tui.Input{
 			Client:  res.client,
 			Org:     res.org,

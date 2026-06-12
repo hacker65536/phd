@@ -5,6 +5,13 @@
 # 優先順位: コマンドラインフラグ > この config > 環境変数(PHD_*) > 既定
 # キーはフラグ名と同じ（ダッシュ含む）。
 
+# 起動モード
+mode: auto                 # auto | tui | cli
+                           #   auto … 端末で実行すれば TUI、パイプ/リダイレクト時は CLI
+                           #   tui  … 常に TUI を主軸に（端末がなければ CLI にフォールバック）
+                           #   cli  … 常に CLI（table/json 等）を主軸に
+                           # ※ -f/-o を明示したコマンドは mode によらず CLI 出力になる
+
 # AWS
 profile: "my-sso-profile"  # ~/.aws/config のプロファイル名
 scope: organization        # organization | account

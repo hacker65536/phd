@@ -58,11 +58,24 @@ go build -o phd .   # version は VCS から自動推定（go install 互換）
 - org スコープは **Organizations 管理アカウント**で実行し、Health の Organizational View が有効であること。
   名前解決には `organizations:ListAccounts` 権限が要る（読み取りのみ）。
 
+## 起動モード（TUI / CLI）
+
+`phd events` は**端末で対話実行すると TUI が起動**し、**パイプ・リダイレクト（`| jq`、`> out.json`、cron）では CLI 出力**になる（既定 `mode: auto`）。スクリプトを壊さずに対話 UI を主役にできる。
+
+- `--mode tui` … 常に TUI を主軸に（端末がなければ CLI にフォールバック）
+- `--mode cli` … 常に CLI（table/json 等）を主軸に
+- `-f`/`-o` を明示したコマンドは mode によらず CLI 出力（その場だけ整形したいとき）
+
+主軸を恒久的に切り替えるなら `config.yaml` に `mode: tui`（または `cli`）を書く。`--tui` は `--mode tui` の非推奨エイリアスとして残している。
+
 ## 基本コマンド
 
+`events` は**既定サブコマンド**なので省略できる（`phd` = `phd events`、`phd --within 90d` = `phd events --within 90d`）。以下の例は明示のため `phd events` と書くが、`events` は外して構わない。`phd version` / `phd --help` 等はそのまま。
+
 ```bash
-# 既定: organization・open+upcoming・開始の近い順・region マージ・table
-phd events --profile <管理アカウントの profile>
+# 既定: organization・open+upcoming・開始の近い順・region マージ
+# （端末なら TUI、パイプ時は table を出力）
+phd --profile <管理アカウントの profile>          # = phd events --profile …
 
 # 本当に対応が必要な「予定」だけを近い順に
 phd events --status upcoming
@@ -104,7 +117,8 @@ phd events --category scheduledChange --show-resources --format csv -o report.cs
 | `--show-occurrences` | `--group-by` 時: 各ファミリー配下の occurrence(日程) を展開 |
 | `--show-details` | 変更内容の説明（latestDescription）を展開 |
 | `--show-resources` | 影響リソースを全アカウント・全リージョン分、平坦テーブルで展開 |
-| `--tui` | 対話的 TUI を起動（一覧→Enter で詳細/影響リソースにドリルダウン）。`--format`/`--output` は無視 |
+| `--mode auto\|tui\|cli` | 起動モード。`auto`（既定）=端末なら TUI・パイプ/リダイレクトなら CLI。`config.yaml` で既定変更可 |
+| `--tui` | `[非推奨]` `--mode tui` のエイリアス |
 | `--no-merge` | region マージ無効 |
 | `-f, --format` | `table\|json\|csv\|markdown` |
 | `-o, --output FILE` | ファイル出力 |
@@ -136,19 +150,22 @@ phd events --group-by topic --service EKS --status upcoming --show-resources
 
 ## 対話的ドリルダウン（TUI）
 
-`--show-occurrences` / `--show-resources` / `--show-details` は静的展開（毎回フラグを変えて再実行）だが、`--tui` を付けると対話的に潜れる。コンソールの「event → リソース → アカウント → リスト」の多クリックを、一覧から Enter 一発に置き換える。
+`--show-occurrences` / `--show-resources` / `--show-details` は静的展開（毎回フラグを変えて再実行）だが、TUI なら対話的に潜れる。コンソールの「event → リソース → アカウント → リスト」の多クリックを、一覧から Enter 一発に置き換える。端末で実行すれば既定で TUI が立ち上がる（[起動モード](#起動モードtui--cli)）。
 
 ```bash
-# 既定（occurrence 一覧）から対話的にドリルダウン
-phd events --tui
+# 既定（occurrence 一覧）から対話的にドリルダウン（端末なら --mode 不要）
+phd events
 
 # group（type/topic）一覧をトップにして group → occurrence → 詳細 と3段で潜る
-phd events --tui --group-by type
+phd events --group-by type
+
+# CLI を主軸にしている環境（config の mode: cli 等）で一時的に TUI を出す
+phd events --mode tui
 ```
 
 - **3ページ構成**: 一覧 → `Enter` で**詳細**（メタ＋説明 latestDescription）→ さらに `Enter` で**影響リソース一覧**（独立ページ）。影響リソースは**アカウント順にソート**し、**既定で RESOLVED を非表示**（`a` で全表示トグル、RESOLVED 行は薄色）。影響リソース一覧で `e` を押すと、**現在表示中のリソースを CSV にエクスポート**（カレントに `phd-resources-<timestamp>.csv` を自動命名で保存。`a` で表示を切り替えた内容がそのまま反映される）。詳細の見出し直下には eventMetadata の人間可読な説明（例「AWS Lambda end of support for Python 3.9」）を表示。詳細・リソースは入場時に遅延ロード（裏で `DescribeEventDetails` / `DescribeAffectedEntities`）。
 - **Esc / Backspace** で1階層戻る（カーソル位置は復元）。`/` でインクリメンタル絞り込み、`q` で終了。
-- 取得条件は CLI と同じ（`--status` `--within` `--service` `--scope` など全フラグが効く）。`--tui` 時は `--format` / `--output` は無視。
+- 取得条件は CLI と同じ（`--status` `--within` `--service` `--scope` など全フラグが効く）。TUI 起動時は `--format` / `--output` は無視（`-f`/`-o` を明示するとそもそも CLI 出力になる）。
 - リソースは初回だけ API を叩き、2回目以降はキャッシュで即時。org スコープではアカウント名（`名前 (ID)`）も解決する。
 
 | キー | 動作 |
