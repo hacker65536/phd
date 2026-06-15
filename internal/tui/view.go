@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/hacker65536/phd/internal/enrich"
 	"github.com/hacker65536/phd/internal/model"
@@ -196,6 +197,18 @@ func (m Model) resourcesView() string {
 	return m.viewportPage(headerText, footerText)
 }
 
+// wrapBody は本文（説明文など）を viewport の幅に折り返す。
+// viewport は既定でワードラップせず幅超過行を横にクリップするため、ここで明示的に折り返す。
+// WrapWc は CJK の文字幅を考慮し、通常はスペースで折り返しつつ、
+// 幅を超える長いトークン（長い URL 等）は強制改行して横はみ出し（コピー時の欠落）を防ぐ。
+func (m Model) wrapBody(s string) string {
+	w := m.detail.Width
+	if w <= 0 {
+		return s
+	}
+	return ansi.WrapWc(s, w, " -")
+}
+
 // detailContent は 1 occurrence の詳細（メタ情報＋説明＋影響リソース）をテキストで組み立てる。
 func (m Model) detailContent(occ model.LogicalEvent, st *occState) string {
 	var b strings.Builder
@@ -229,7 +242,7 @@ func (m Model) detailContent(occ model.LogicalEvent, st *occState) string {
 	case st.dState == stateFailed:
 		b.WriteString(errStyle.Render(fmt.Sprintf("failed: %v", st.err)) + "\n")
 	case st.detail.Description != "":
-		b.WriteString(render.SanitizeText(st.detail.Description))
+		b.WriteString(m.wrapBody(render.SanitizeText(st.detail.Description)))
 		b.WriteByte('\n')
 	default:
 		b.WriteString("(no description)\n")

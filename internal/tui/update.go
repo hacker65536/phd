@@ -15,6 +15,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 		m.relayout()
+		m.refreshViewport() // 新しい幅で本文を折り返し直す（詳細/リソース表示中のみ）
 		return m, nil
 
 	case tea.KeyMsg:
@@ -398,15 +399,20 @@ func (m Model) cycleGroupBy() (tea.Model, tea.Cmd) {
 // refreshDetailIfViewing は現在その occurrence の詳細/リソースを表示中なら viewport を再描画する
 // （遅延ロード到着時。スクロール位置は維持するため GotoTop しない）。
 func (m *Model) refreshDetailIfViewing(key string) {
-	t := m.top()
-	if t.occKey != key {
-		return
+	if m.top().occKey == key {
+		m.refreshViewport()
 	}
+}
+
+// refreshViewport は詳細/リソースページの本文を現在の幅で再描画する
+// （リサイズ時に折り返し幅を反映するため。スクロール位置は維持）。
+func (m *Model) refreshViewport() {
+	t := m.top()
 	switch t.level {
 	case levelDetail:
-		m.detail.SetContent(m.detailContent(t.occ, m.state[key]))
+		m.detail.SetContent(m.detailContent(t.occ, m.state[t.occKey]))
 	case levelResources:
-		m.detail.SetContent(m.resourcesContent(m.state[key]))
+		m.detail.SetContent(m.resourcesContent(m.state[t.occKey]))
 	}
 }
 
