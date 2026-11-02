@@ -80,7 +80,7 @@ homebrew_casks:
     # （これがないと Gatekeeper に「開発元を確認できない」とブロックされる）。
     hooks:
       post:
-        install: |
-          if OS.mac?
-            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/phd"]
+        install_steps: |
+          on_macos do
+            run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/phd"]
           end
